@@ -79,7 +79,7 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
 
   const [newSample, setNewSample] = useState<Omit<Sample, 'id'>>({
     sampleNo: `S-${1000 + samples.length + 1}`,
-    location: defaultSite || '',
+    location: { x: 0, y: 0 },
     surfaceType: '',
     itemDescription: '',
     materialType: '',
@@ -102,7 +102,7 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
 
   useEffect(() => {
     if (defaultSite) {
-      setNewSample(prev => ({ ...prev, location: defaultSite }));
+      setNewSample(prev => ({ ...prev, location: { x: 0, y: 0 } }));
     }
   }, [defaultSite]);
 
@@ -213,7 +213,9 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
                     <TableCell className="font-mono font-bold text-emerald-700">{sample.sampleNo || sample.sampleId}</TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-bold text-slate-900 text-sm">{sample.location || sample.site}</span>
+                        <span className="font-bold text-slate-900 text-sm">
+                          {typeof sample.location === 'object' ? `${sample.location.x},${sample.location.y}` : 'N/A'}
+                        </span>
                         <span className="text-[11px] text-slate-500 font-medium">{sample.surfaceType || sample.area}</span>
                       </div>
                     </TableCell>

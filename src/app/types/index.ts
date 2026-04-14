@@ -109,7 +109,7 @@ export type RiskLevel = 'low' | 'medium' | 'high' | 'very-high';
 export interface Sample {
   id: string;
   sampleNo: string;
-  location: string;
+  location: { x: number; y: number };
   surfaceType?: string;
   itemDescription?: string;
   materialType?: string;
@@ -141,6 +141,11 @@ export interface Sample {
   area?: string;
   riskLevel?: RiskLevel;
   status?: SampleStatus;
+  equipment?: string;
+  level?: string;
+  condition?: string;
+  amount?: string;
+  materialDescription?: string;
 }
 
 export type SampleFieldType = 'text' | 'number' | 'date' | 'dropdown' | 'multi-select' | 'checkbox';

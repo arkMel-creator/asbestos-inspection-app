@@ -32,8 +32,8 @@ const jsonFetch = async <T>(path: string, options: RequestInit = {}) => {
     headers: {
       'Content-Type': 'application/json',
       ...authHeaders(),
-      ...(options.headers || {})
-    }
+      ...(options.headers as Record<string, string> || {})
+    } as HeadersInit
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: 'Request failed' }));
@@ -48,8 +48,8 @@ const formFetch = async <T>(path: string, body: FormData, options: RequestInit =
     method: options.method || 'POST',
     headers: {
       ...authHeaders(),
-      ...(options.headers || {})
-    },
+      ...(options.headers as Record<string, string> || {})
+    } as HeadersInit,
     body
   });
   if (!res.ok) {

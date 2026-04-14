@@ -3,21 +3,15 @@ import { Rnd } from 'react-rnd';
 import { MapOverlay, Sample, SampleStatus, RiskLevel, Project } from '../types';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
-import { Slider } from './ui/slider';
-import { Badge } from './ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Input } from './ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import {
-  Eye,
-  EyeOff,
-  Lock,
-  Unlock,
-  Trash2,
-  ArrowUp,
-  ArrowDown,
-  RotateCw,
-  Move,
   ZoomIn,
   ZoomOut,
   Layers,
@@ -26,7 +20,10 @@ import {
   Filter,
   Plus,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Eye,
+  Lock,
+  ArrowUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -232,12 +229,15 @@ export function MapView({
     const nextIndex = 1000 + samples.length + 1;
     const sampleId = `S-${nextIndex}`;
     const newSample: Omit<Sample, 'id'> = {
+      sampleNo: sampleId,
       sampleId,
       site: project?.site || 'Unassigned',
       area: 'Unassigned',
       equipment: 'Unassigned',
       sampleType: 'Bulk',
       collectionDate: new Date().toISOString().split('T')[0],
+      location: { x: 0, y: 0 },
+      assessmentStatus: 'pending',
       status: 'pending',
       riskLevel: 'medium',
       collector: 'Current User',
@@ -421,8 +421,8 @@ export function MapView({
                     position={{ x: overlay.position.x, y: overlay.position.y }}
                     size={{ width: overlay.size.width, height: overlay.size.height }}
                     style={{ zIndex: overlay.zIndex ?? 1 }}
-                    onDragStop={(e, d) => onUpdateOverlay(overlay.id, { position: { x: d.x, y: d.y } })}
-                    onResizeStop={(e, direction, ref, delta, pos) => onUpdateOverlay(overlay.id, { size: { width: parseInt(ref.style.width), height: parseInt(ref.style.height) }, position: pos })}
+                    onDragStop={((e: any, d: any) => onUpdateOverlay(overlay.id, { position: { x: d.x, y: d.y } })) as any}
+                    onResizeStop={((e: any, direction: any, ref: any, delta: any, pos: any) => onUpdateOverlay(overlay.id, { size: { width: parseInt(ref.style.width), height: parseInt(ref.style.height) }, position: pos })) as any}
                     scale={zoom}
                     disableDragging={overlay.locked}
                     enableResizing={!overlay.locked}

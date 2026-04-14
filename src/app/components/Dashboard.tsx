@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Sample, Project, User } from '../types';
-import { Map as MapIcon, Share2, ClipboardList, Briefcase, ChevronRight, Calendar as CalendarIcon, Bell, Clock, ChevronLeft, Settings, X, Search, Check } from 'lucide-react';
+import { Project, User, Sample } from '../types';
+import { Map as MapIcon, Share2, ClipboardList, Briefcase, ChevronRight, Settings, X, Search, Check, ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, isToday, addWeeks, subWeeks } from 'date-fns';
@@ -11,38 +11,26 @@ interface DashboardProps {
   projects: Project[];
   users: User[];
   currentUser: User;
-  onNavigate: (view: string) => void;
+  onNavigate: (view: any) => void;
   onOpenProject: (projectName: string) => void;
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
 }
 
-export function Dashboard({ samples, projects, users, currentUser, onNavigate, onOpenProject, onUpdateProject }: DashboardProps) {
+export function Dashboard({ projects, users, currentUser, onNavigate, onOpenProject, onUpdateProject }: DashboardProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [assigningProject, setAssigningProject] = useState<Project | null>(null);
   const [userSearch, setUserSearch] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [visibleCategories, setVisibleCategories] = useState({
     jobs: true,
-    quotes: true,
-    recurring: true
   });
 
-  // Filter projects assigned to the current user
   const myProjects = useMemo(() => {
-    return projects.filter(p => p.manager === currentUser.name || p.manager === currentUser.username);
+    return projects.filter(p => p.manager === currentUser.name || (p.assignedStaff || []).includes(currentUser.name));
   }, [projects, currentUser]);
 
-  // Calendar Event Logic
   const jobDeadlines = useMemo(() => {
-    const deadlines: Record<string, Project[]> = {};
-    projects.forEach(p => {
-      if (p.dueDate) {
-        const date = p.dueDate.split('T')[0];
-        if (!deadlines[date]) deadlines[date] = [];
-        deadlines[date].push(p);
-      }
-    });
-    return deadlines;
+    return projects.filter(p => p.dueDate && new Date(p.dueDate) > new Date()).sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
   }, [projects]);
 
   const filteredUsers = useMemo(() => {
@@ -51,6 +39,18 @@ export function Dashboard({ samples, projects, users, currentUser, onNavigate, o
       u.role.toLowerCase().includes(userSearch.toLowerCase())
     );
   }, [users, userSearch]);
+
+  const calendarEvents = useMemo(() => {
+    const deadlines: Record<string, Project[]> = {};
+    projects.forEach(p => {
+      if (p.dueDate) {
+        const dateKey = format(new Date(p.dueDate), 'yyyy-MM-dd');
+        if (!deadlines[dateKey]) deadlines[dateKey] = [];
+        deadlines[dateKey].push(p);
+      }
+    });
+    return deadlines;
+  }, [projects]);
 
   const quickActions = [
     {
@@ -80,6 +80,13 @@ export function Dashboard({ samples, projects, users, currentUser, onNavigate, o
       icon: Share2,
       color: 'bg-amber-50 text-amber-600 border-amber-100',
       action: () => onNavigate('sharing')
+    },
+    {
+      title: 'Settings',
+      description: 'Manage app configuration',
+      icon: Settings,
+      color: 'bg-slate-50 text-slate-600 border-slate-100',
+      action: () => setShowSettings(true)
     }
   ];
 

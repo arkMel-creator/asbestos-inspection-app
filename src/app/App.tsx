@@ -10,14 +10,14 @@ import { Workspace } from './components/Workspace';
 import { Reports } from './components/Reports';
 import { MapOverlay, User, ShareLink, FileItem, Sample, AuditLogEntry, SyncQueueItem, Project } from './types';
 import { Button } from './components/ui/button';
-import { LayoutDashboard, Map, Users, Share2, Menu, X, ClipboardList, History, LogOut, CloudOff, Search, Briefcase, Plus, MapPin, Filter, ChevronRight, Edit2, ArrowLeft, Check, FileClock } from 'lucide-react';
+import { LayoutDashboard, Map, Users, Share2, Menu, X, ClipboardList, History, LogOut, CloudOff, Search, Briefcase, Plus, MapPin, Filter, ChevronRight, Edit2, ArrowLeft, Check, FileClock, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Label } from './components/ui/label';
 import { Input } from './components/ui/input';
 import { toast, Toaster } from 'sonner';
 import { api, getToken, setToken } from './lib/api';
 
-type View = 'dashboard' | 'projects' | 'create-project' | 'edit-project' | 'workspace' | 'map' | 'users' | 'sharing' | 'audit' | 'offline' | 'search' | 'reports' | 'project-log';
+type View = 'dashboard' | 'projects' | 'create-project' | 'edit-project' | 'workspace' | 'map' | 'users' | 'sharing' | 'audit' | 'offline' | 'search' | 'reports' | 'project-log' | 'project-detail';
 
 const jobCategories = ['Asbestos Survey', 'Air Monitoring', 'Clearance Inspection', 'Management Plan', 'Remediation Oversight'];
 const jobTemplates = ['Standard Div 6', 'Residential Management', 'Commercial Audit', 'Pre-Demolition'];
@@ -45,6 +45,7 @@ export default function App() {
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [currentProjectsTab, setCurrentProjectsTab] = useState<'active' | 'completed' | 'all'>('active');
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const canEdit = currentUser?.role === 'admin' || currentUser?.role === 'inspector';
@@ -117,6 +118,19 @@ export default function App() {
   };
 
   // Overlay management
+  const queueIfOffline = (action: 'create' | 'update' | 'delete' | 'upload', entity: string, payload: any) => {
+    if (isOnline) return;
+    const item: SyncQueueItem = {
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      action,
+      entity,
+      payload
+    };
+    setSyncQueue(prev => [...prev, item]);
+    toast.info('Action queued (Offline)');
+  };
+
   const handleUpdateOverlay = (id: string, updates: Partial<MapOverlay>) => {
     setOverlays(overlays.map(o => o.id === id ? { ...o, ...updates } : o));
     addAudit('Updated overlay', id);
@@ -261,9 +275,9 @@ export default function App() {
     const nextIndex = 1000 + samples.length + 1;
     const sampleId = `S-${nextIndex}`;
     const newSample: Sample = {
-      id: sampleId,
+      id: crypto.randomUUID(),
       sampleNo: sampleId,
-      location: selectedProject?.site || 'Unassigned',
+      location: { x: 0, y: 0 },
       itemDescription: 'Created from file',
       materialType: 'Unknown',
       sampleType: 'Photo',
@@ -714,18 +728,48 @@ export default function App() {
                 {isOnline ? 'Online' : 'Offline'}
               </div>
               <div className="w-px h-8 bg-border/60" />
-              <div className="flex items-center gap-2.5">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xs font-semibold shadow-sm">
-                  {userInitials}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium leading-tight">{currentUser.name}</p>
-                  <p className="text-[11px] text-muted-foreground leading-tight capitalize">{currentUser.role}</p>
-                </div>
+              
+              <div className="relative">
+                <button 
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 p-1 rounded-lg transition-colors outline-none"
+                >
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xs font-semibold shadow-sm">
+                    {userInitials}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium leading-tight">{currentUser.name}</p>
+                    <p className="text-[11px] text-muted-foreground leading-tight capitalize">{currentUser.role}</p>
+                  </div>
+                </button>
+
+                {showProfileMenu && (
+                  <>
+                    <div className="fixed inset-0 z-[55]" onClick={() => setShowProfileMenu(false)} />
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 p-1 z-[60]">
+                      <button 
+                        className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded flex items-center gap-2 transition-colors"
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          toast.info('Settings opening...');
+                        }}
+                      >
+                        <Settings className="h-4 w-4" /> Settings
+                      </button>
+                      <div className="h-px bg-slate-100 my-1" />
+                      <button 
+                        onClick={() => {
+                          setShowProfileMenu(false);
+                          handleLogout();
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-red-50 rounded flex items-center gap-2 transition-colors"
+                      >
+                        <LogOut className="h-4 w-4" /> Sign Out
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
-              <Button variant="ghost" size="icon" onClick={handleLogout} className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                <LogOut className="h-4 w-4" />
-              </Button>
             </div>
 
             <div className="flex md:hidden items-center gap-1 ml-auto">
@@ -781,7 +825,6 @@ export default function App() {
             onUpdateProject={handleUpdateProject}
           />
         )}
-
         {currentView === 'projects' && (
           <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1181,7 +1224,6 @@ export default function App() {
             selectedFolder={filesFolder}
             onFolderChange={setFilesFolder}
             showTabs={false}
-            auditLog={auditLog}
             currentUser={currentUser}
             project={selectedProject}
             onViewMap={() => setCurrentView('map')}
