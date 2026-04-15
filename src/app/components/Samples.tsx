@@ -1,15 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Sample, SampleFieldDefinition, SampleFieldType, SampleStatus, RiskLevel } from '../types';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { useEffect, useState } from 'react';
+import { Sample, SampleFieldDefinition, SampleFieldType, SampleStatus } from '../types';
+import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Textarea } from './ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { Plus, Search, ClipboardList, Settings, Edit2, Camera } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Plus, Search, Settings, Edit2, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface SamplesProps {
