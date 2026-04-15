@@ -5,3 +5,5 @@ server/uploads/
 .env
 .DS_Store
 *.log
+.vite/
+server/data.sqlite
