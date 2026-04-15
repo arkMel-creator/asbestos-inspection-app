@@ -1,53 +1,62 @@
 
 # Asbestos Inspection Management System (AIMS)
 
-A comprehensive web-based application for managing asbestos inspection projects, samples, documentation, and team coordination. Built with React, TypeScript, and Express.js.
+A comprehensive web-based application for managing asbestos inspection projects, samples, documentation, and team coordination. Built with a modern full-stack architecture focusing on speed, reliability, and ease of use.
 
-**Design Source:** https://www.figma.com/design/6EdnSNJAi85xmFhRrFnBkQ/Asbestos-Inspection-Management-System
+**Design Source:** [Figma Design](https://www.figma.com/design/6EdnSNJAi85xmFhRrFnBkQ/Asbestos-Inspection-Management-System)
 
 ## Features
 
-- **Dashboard** - Overview of samples, files, and recent activities
-- **Sample Management** - Create, track, and manage asbestos samples with customizable fields
-- **File Management** - Upload, organize, and link documents to samples
-- **Map Integration** - Overlay site maps and floor plans with interactive positioning
-- **User Management** - Role-based access control (Admin, Editor, Viewer)
-- **Sharing** - Create secure share links with expiration dates
-- **Reports** - Export data in CSV, Excel, or PDF formats
-- **Audit Logging** - Track all user actions and changes
-- **Offline Support** - Queue actions while offline and sync when reconnected
-- **Global Search** - Find samples, files, users, and shares across the system
+- **Dashboard** - High-level overview of project health, sample status, and recent activities.
+- **Project Management** - Organize inspections into specific projects with metadata and status tracking.
+- **Sample Management** - Detailed tracking of asbestos samples, including types, concentrations, and risk levels.
+- **File & Asset Management** - robust system for uploading site photos, floor plans, and lab reports.
+- **Interactive Map Integration** - Overlay site maps with floor plans and position samples using precise coordinates.
+- **User Management** - Secure role-based access control (Admin, Inspector, Viewer, External).
+- **Secure Sharing** - Generate protected share links for external stakeholders with expiration and password options.
+- **Advanced Reporting** - Export professional reports in PDF, Excel (XLSX), and CSV formats.
+- **Audit Logging** - Complete transparency with detailed logs of all system actions.
+- **Offline Capabilities** - Intelligent offline queueing that syncs your work once a connection is restored.
+- **Global Search** - Instant access to any sample, file, or project across the entire system.
 
 ## Technology Stack
 
 ### Frontend
-- **React 18** - UI framework
-- **TypeScript** - Type safety
-- **Vite** - Fast build tooling
-- **Tailwind CSS** - Utility-first styling
-- **Radix UI** - Accessible component library
-- **Leaflet** - Map integration
-- **Chart Library** - Data visualization (Recharts)
+- **React 18** - Modern functional component architecture.
+- **TypeScript** - Strict typing for robust development.
+- **Vite 6** - Lightning-fast build and development tooling.
+- **Tailwind CSS 4** - Next-generation utility-first styling.
+- **Radix UI & Shadcn/UI** - Accessible, high-quality primitive components.
+- **Material UI (MUI)** - Polished UI components and iconography.
+- **Leaflet** - High-performance interactive maps.
+- **Recharts** - Dynamic data visualization and charting.
+- **Motion** - Fluid animations and transitions.
 
 ### Backend
-- **Express.js** - Node.js web framework
-- **SQLite** - Lightweight database
-- **JWT** - Authentication & authorization
-- **Bcrypt** - Password hashing
-- **Multer** - File upload handling
+- **Express.js** - Lightweight and scalable Node.js framework.
+- **SQLite 3** - Reliable, serverless relational database.
+- **JWT (JSON Web Tokens)** - Secure stateless authentication.
+- **Bcrypt.js** - Industry-standard password hashing.
+- **Multer** - Advanced multi-part file upload handling.
 
 ## Prerequisites
 
-- **Node.js** (v18 or higher)
-- **npm** or **yarn** package manager
-- Windows, macOS, or Linux OS
+- **Node.js** (v18 or higher recommended)
+- **npm** (included with Node.js)
+- **Windows OS** (Optimized for Windows with included .bat scripts)
 
-## Installation
+## Installation & Setup
 
-### 1. Install Dependencies
+### 1. Automated Setup (Windows)
+Run the included setup script to install all dependencies for both frontend and backend:
+```powershell
+.\setup.bat
+```
 
+### 2. Manual Installation
+If not using the setup script:
 ```bash
-# Install frontend dependencies
+# Install root (frontend) dependencies
 npm install
 
 # Install backend dependencies
@@ -56,220 +65,92 @@ npm install
 cd ..
 ```
 
-### 2. Configuration (Optional)
-
-Backend environment variables (create `.env` in the `server/` directory):
-
-```env
-PORT=3000
-JWT_SECRET=your-secret-key-change-in-production
-ADMIN_USER=admin
-ADMIN_PASS=admin123
-```
-
-Default admin credentials:
-- Username: `admin`
-- Password: `admin123`
-
-**⚠️ Change these credentials in production!**
-
 ## Running the Application
 
-### Development Mode
-
-**Windows:**
-```bash
-start-dev.bat
+### Development Mode (Windows)
+To start both the Vite dev server and the Express backend simultaneously:
+```powershell
+.\start-dev.bat
 ```
-
-**macOS/Linux:**
-```bash
-npm install
-cd server && npm install && cd ..
-# Terminal 1
-npm run dev
-
-# Terminal 2 (in another terminal window)
-cd server
-node server.js
-```
-
-The application will be available at:
 - **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3000
+- **Backend**: http://localhost:3000
 
-### Production Mode
-
-**Windows:**
-```bash
-start-prod.bat
+### Production Mode (Windows)
+To build the frontend and serve it via the production Express server:
+```powershell
+.\start-prod.bat
 ```
-
-**macOS/Linux:**
-```bash
-npm run build
-cd server
-node server.js
-```
-
-Access the application at: http://localhost:3000
+The application will be accessible at: http://localhost:3000
 
 ## Project Structure
 
 ```
 asbestos-inspection-app/
-├── src/
-│   ├── main.tsx                 # Entry point
+├── src/                        # Frontend source code
 │   ├── app/
-│   │   ├── App.tsx             # Main application component
-│   │   ├── components/         # React components
-│   │   │   ├── Dashboard.tsx
-│   │   │   ├── Samples.tsx
-│   │   │   ├── Files.tsx
-│   │   │   ├── MapView.tsx
-│   │   │   ├── UserManagement.tsx
-│   │   │   ├── Sharing.tsx
-│   │   │   ├── Reports.tsx
-│   │   │   ├── AuditLog.tsx
-│   │   │   ├── OfflineQueue.tsx
-│   │   │   ├── GlobalSearch.tsx
-│   │   │   └── ui/            # UI component library
-│   │   ├── types/
-│   │   │   └── index.ts        # TypeScript interfaces
-│   │   └── data/
-│   │       └── mockData.ts     # Mock data for development
-│   └── styles/                 # CSS files
-├── server/
-│   ├── server.js               # Express server
-│   ├── db.js                   # Database schema & helpers
-│   ├── package.json            # Backend dependencies
-│   ├── uploads/                # File uploads directory
-│   └── data.sqlite             # SQLite database (created on first run)
-├── dist/                       # Production build output (generated)
-├── index.html                  # HTML entry point
-├── vite.config.ts              # Vite configuration
-├── postcss.config.mjs          # PostCSS configuration
-├── tailwind.config.mjs         # Tailwind CSS configuration
-├── package.json                # Frontend dependencies
-└── README.md                   # This file
+│   │   ├── components/         # React components (Dashboard, Samples, etc.)
+│   │   │   ├── ui/             # Reusable UI primitives
+│   │   │   └── figma/          # Figma-specific UI elements
+│   │   ├── lib/                # API clients and utilities
+│   │   └── types/              # TypeScript definitions
+│   └── styles/                 # Global CSS and themes
+├── server/                     # Backend source code
+│   ├── server.js               # Main Express application
+│   ├── db.js                   # SQLite database logic
+│   ├── uploads/                # Directory for uploaded files
+│   └── data.sqlite             # Local database file
+├── guidelines/                 # Project documentation and standards
+├── example pages to learn from/ # Reference material for UI/UX
+├── dist/                       # Compiled production build
+└── *.bat                       # Windows utility scripts
 ```
 
-## API Endpoints
+## API Reference
 
 ### Authentication
-- `POST /api/auth/login` - User login
+- `POST /api/auth/login` - Authenticate user and receive JWT.
+
+### Projects
+- `GET /api/projects` - Retrieve all projects.
+- `POST /api/projects` - Create a new project.
+- `PATCH /api/projects/:id` - Update project details.
+- `DELETE /api/projects/:id` - Remove a project (Admin only).
 
 ### Samples
-- `GET /api/samples` - List all samples
-- `GET /api/samples/:id` - Get sample details
-- `POST /api/samples` - Create new sample
-- `PATCH /api/samples/:id` - Update sample
-
-### Users
-- `GET /api/users` - List users (admin only)
-- `POST /api/users` - Create user (admin only)
+- `GET /api/samples` - List all inspection samples.
+- `POST /api/samples` - Create a sample (supports file uploads).
+- `PATCH /api/samples/:id` - Update sample data and coordinates.
 
 ### Files
-- `POST /api/samples/:id/upload` - Upload files to a sample
-- `GET /api/files/:path` - Download file
+- `GET /api/files` - List all uploaded files.
+- `POST /api/files` - Upload new documents or images.
+- `DELETE /api/files/:id` - Delete a specific file.
 
 ### Sharing
-- `POST /api/shares` - Create share link
-- `GET /api/shares/:token` - Access shared content
+- `GET /api/shares` - List all active share links.
+- `POST /api/shares` - Create a new secure share.
+- `DELETE /api/shares/:token` - Revoke a share link.
 
-### Health
-- `GET /api/health` - Server health check
+## User Roles
 
-## User Roles & Permissions
+| Role | Permissions |
+|------|-------------|
+| **Admin** | Full system access, user management, and data resets. |
+| **Inspector** | Create/Edit samples and projects, upload files, generate reports. |
+| **Viewer** | Read-only access to samples, projects, and reports. |
+| **External** | Limited read-only access restricted to shared content. |
 
-| Feature | Admin | Editor | Viewer |
-|---------|-------|--------|--------|
-| View Dashboard | ✓ | ✓ | ✓ |
-| View Samples | ✓ | ✓ | ✓ |
-| Create Samples | ✓ | ✓ | ✗ |
-| Edit Samples | ✓ | ✓ | ✗ |
-| Manage Users | ✓ | ✗ | ✗ |
-| Share Content | ✓ | ✓ | ✗ |
-| View Audit Log | ✓ | ✗ | ✗ |
-| Generate Reports | ✓ | ✓ | ✓ |
+## Security & Configuration
 
-## Database
-
-SQLite database is automatically created on first server run with tables for:
-- **samples** - Asbestos sample records
-- **files** - File uploads and references
-- **users** - User accounts and roles
-- **shares** - Share links and tokens
-
-Reset database (deletes all data):
-```bash
-# Send authenticated DELETE request to /api/reset (admin only)
+Create a `.env` file in the `server/` directory for production settings:
+```env
+PORT=3000
+JWT_SECRET=your_secure_random_string
+ADMIN_USER=admin
+ADMIN_PASS=admin123
 ```
-
-## Offline Support
-
-The application automatically:
-- Detects online/offline status
-- Queues actions while offline
-- Syncs with server when reconnected
-- Preserves data in local storage
-
-## Building for Production
-
-```bash
-npm run build
-```
-
-This creates optimized files in the `dist/` directory ready for deployment.
-
-## Development Tips
-
-1. **Mock Data** - Edit `src/app/data/mockData.ts` to customize sample data
-2. **Styling** - Modify Tailwind classes in components or `src/styles/tailwind.css`
-3. **Components** - UI components are in `src/app/components/ui/`
-4. **Types** - All TypeScript types are in `src/app/types/index.ts`
-5. **Backend Routes** - Modify `server/server.js` to add new API endpoints
-
-## Troubleshooting
-
-### Backend won't start
-- Ensure Node.js is installed: `node --version`
-- Check port 3000 is not in use
-- Verify SQLite3 is installed: `npm list sqlite3`
-
-### Frontend build errors
-- Clear node_modules: `rm -r node_modules && npm install`
-- Clear Vite cache: `rm -r node_modules/.vite`
-
-### Database issues
-- Delete `server/data.sqlite` and restart (recreates with fresh schema)
-- Check file permissions in server directory
-
-### Port conflicts
-- Change PORT in `server/server.js` or `server/.env`
-- Change Vite port in `vite.config.ts`
-
-## Performance Optimization
-
-The production build generates chunks up to ~1.2 MB. For optimization:
-- Enable code splitting in `vite.config.ts`
-- Consider lazy loading for heavy components
-- Compress images before uploading
-- Use CDN for static assets on production
-
-## License
-
-This project was created based on Figma design specifications.
-
-## Support
-
-For issues or questions:
-1. Check the troubleshooting section above
-2. Review console logs (browser DevTools and server terminal)
-3. Check API responses in Network tab
+*Note: The system automatically initializes an admin user on first run if none exists.*
 
 ---
-
-**Last Updated:** February 7, 2026
-**Status:** ✅ Production Ready
-  
+**Last Updated:** April 15, 2026
+**Project Status:** 🚀 Active Development
