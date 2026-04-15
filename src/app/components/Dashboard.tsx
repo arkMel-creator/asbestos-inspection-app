@@ -4,7 +4,7 @@ import { Project, User, Sample } from '../types';
 import { Map as MapIcon, Share2, ClipboardList, Briefcase, ChevronRight, Settings, X, Search, Check, ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, isToday, addWeeks, subWeeks } from 'date-fns';
+import { format, startOfWeek, endOfWeek, addDays, isToday, addWeeks, subWeeks } from 'date-fns';
 
 interface DashboardProps {
   samples: Sample[];
@@ -23,15 +23,13 @@ export function Dashboard({ projects, users, currentUser, onNavigate, onOpenProj
   const [showSettings, setShowSettings] = useState(false);
   const [visibleCategories, setVisibleCategories] = useState({
     jobs: true,
+    quotes: true,
+    recurring: true,
   });
 
   const myProjects = useMemo(() => {
     return projects.filter(p => p.manager === currentUser.name || (p.assignedStaff || []).includes(currentUser.name));
   }, [projects, currentUser]);
-
-  const jobDeadlines = useMemo(() => {
-    return projects.filter(p => p.dueDate && new Date(p.dueDate) > new Date()).sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
-  }, [projects]);
 
   const filteredUsers = useMemo(() => {
     return users.filter(u => 
@@ -94,7 +92,7 @@ export function Dashboard({ projects, users, currentUser, onNavigate, onOpenProj
   const renderCalendar = () => {
     const startDate = startOfWeek(currentDate, { weekStartsOn: 1 });
     const endDate = endOfWeek(startDate, { weekStartsOn: 1 });
-    const weekDays = [];
+    const weekDays: Date[] = [];
     let day = startDate;
 
     while (day <= endDate) {
@@ -182,7 +180,7 @@ export function Dashboard({ projects, users, currentUser, onNavigate, onOpenProj
         <div className="grid grid-cols-7 h-[460px] bg-white divide-x divide-slate-100">
           {weekDays.map((day, idx) => {
             const dateKey = format(day, "yyyy-MM-dd");
-            const projectsOnDay = jobDeadlines[dateKey] || [];
+            const projectsOnDay = calendarEvents[dateKey] || [];
             const isTodayDay = isToday(day);
             
             return (

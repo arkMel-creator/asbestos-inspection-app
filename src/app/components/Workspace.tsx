@@ -41,8 +41,6 @@ export function Workspace({
   onLinkToSample,
   selectedFolder,
   onFolderChange,
-  showTabs = true,
-  currentUser,
   project,
   onViewMap
 }: WorkspaceProps) {

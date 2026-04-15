@@ -18,7 +18,7 @@ interface UserManagementProps {
   onDeleteUser: (id: string) => void;
 }
 
-export function UserManagement({ users, onAddUser, onUpdateUser, onDeleteUser }: UserManagementProps) {
+export function UserManagement({ users, onAddUser, onDeleteUser }: UserManagementProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({

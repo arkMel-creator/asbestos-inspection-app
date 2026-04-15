@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { Rnd } from 'react-rnd';
-import { MapOverlay, Sample, SampleStatus, RiskLevel, Project } from '../types';
+import { MapOverlay, Sample, SampleStatus, Project } from '../types';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import {
@@ -23,7 +23,10 @@ import {
   ChevronRight,
   Eye,
   Lock,
-  ArrowUp
+  ArrowUp,
+  RotateCw,
+  Trash2,
+  ChevronUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -64,7 +67,6 @@ export function MapView({
   const [selectedSample, setSelectedSample] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [showLayersPanel, setShowLayersPanel] = useState(true);
   const [expandedSections, setExpandedSections] = useState({
     filters: true,
     layers: true,
@@ -72,16 +74,10 @@ export function MapView({
     addSample: true
   });
   
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; overlayId: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [statusFilter, setStatusFilter] = useState<SampleStatus | 'all'>('all');
-  const [riskFilter, setRiskFilter] = useState<RiskLevel | 'all'>('all');
-  const [siteFilter, setSiteFilter] = useState<string>('all');
   const [areaFilter, setAreaFilter] = useState<string>('all');
-  const [equipmentFilter, setEquipmentFilter] = useState<string>('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
   const [placementSampleId, setPlacementSampleId] = useState<string>('');
   const [pendingUploads, setPendingUploads] = useState<Array<{
     file: File;
@@ -143,26 +139,18 @@ export function MapView({
   };
 
   const orderedOverlays = [...overlays].sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
-  const selectedSampleData = samples.find(s => s.id === selectedSample);
 
-  const uniqueValues = (values: string[]) => Array.from(new Set(values)).filter(Boolean);
-  const sites = uniqueValues(samples.map(s => s.site));
+  const uniqueValues = (values: (string | undefined)[]) => Array.from(new Set(values.filter((v): v is string => !!v)));
   const areas = uniqueValues(samples.map(s => s.area));
-  const equipment = uniqueValues(samples.map(s => s.equipment));
 
   const filteredSamples = samples.filter(sample => {
     if (!sample.location) return false;
     if (statusFilter !== 'all' && sample.status !== statusFilter) return false;
-    if (riskFilter !== 'all' && sample.riskLevel !== riskFilter) return false;
-    if (siteFilter !== 'all' && sample.site !== siteFilter) return false;
     if (areaFilter !== 'all' && sample.area !== areaFilter) return false;
-    if (equipmentFilter !== 'all' && sample.equipment !== equipmentFilter) return false;
-    if (dateFrom && sample.collectionDate < dateFrom) return false;
-    if (dateTo && sample.collectionDate > dateTo) return false;
     return true;
   });
 
-  const getStatusColor = (status: SampleStatus) => {
+  const getStatusColor = (status: SampleStatus | undefined) => {
     switch (status) {
       case 'pending': return 'bg-yellow-500';
       case 'positive': return 'bg-red-600';
@@ -325,11 +313,23 @@ export function MapView({
                   <div className="p-4 space-y-3 animate-in slide-in-from-top-2 duration-200">
                     {orderedOverlays.map((overlay) => (
                       <div key={overlay.id} className={`p-2.5 border rounded-lg hover:bg-slate-50 transition-all ${selectedOverlay === overlay.id ? 'border-blue-500 bg-blue-50/30' : 'border-slate-100'}`} onClick={() => setSelectedOverlay(overlay.id)}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-semibold truncate flex-1">{overlay.name}</span>
-                          <div className="flex gap-0.5">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onUpdateOverlay(overlay.id, { visible: !overlay.visible }); }}><Eye className={`h-3 w-3 ${overlay.visible ? 'text-blue-500' : 'text-slate-300'}`} /></Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onUpdateOverlay(overlay.id, { locked: !overlay.locked }); }}><Lock className={`h-3 w-3 ${overlay.locked ? 'text-amber-500' : 'text-slate-300'}`} /></Button>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold truncate flex-1">{overlay.name}</span>
+                            <div className="flex gap-0.5">
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onUpdateOverlay(overlay.id, { visible: !overlay.visible }); }}><Eye className={`h-3 w-3 ${overlay.visible ? 'text-blue-500' : 'text-slate-300'}`} /></Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onUpdateOverlay(overlay.id, { locked: !overlay.locked }); }}><Lock className={`h-3 w-3 ${overlay.locked ? 'text-amber-500' : 'text-slate-300'}`} /></Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={(e) => { e.stopPropagation(); if(confirm('Delete this overlay?')) onDeleteOverlay(overlay.id); }}><Trash2 className="h-3 w-3" /></Button>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex gap-1">
+                              <Button variant="outline" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onReorderOverlay(overlay.id, 'down'); }} title="Move Down (Lower Z-Index)"><ChevronDown className="h-3 w-3" /></Button>
+                              <Button variant="outline" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onReorderOverlay(overlay.id, 'up'); }} title="Move Up (Higher Z-Index)"><ChevronUp className="h-3 w-3" /></Button>
+                            </div>
+                            <Button variant="outline" size="icon" className="h-6 w-6 gap-1" onClick={(e) => { e.stopPropagation(); handleRotate(overlay.id); }} title="Rotate 15°">
+                              <RotateCw className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -421,8 +421,8 @@ export function MapView({
                     position={{ x: overlay.position.x, y: overlay.position.y }}
                     size={{ width: overlay.size.width, height: overlay.size.height }}
                     style={{ zIndex: overlay.zIndex ?? 1 }}
-                    onDragStop={((e: any, d: any) => onUpdateOverlay(overlay.id, { position: { x: d.x, y: d.y } })) as any}
-                    onResizeStop={((e: any, direction: any, ref: any, delta: any, pos: any) => onUpdateOverlay(overlay.id, { size: { width: parseInt(ref.style.width), height: parseInt(ref.style.height) }, position: pos })) as any}
+                    onDragStop={((_e: any, d: any) => onUpdateOverlay(overlay.id, { position: { x: d.x, y: d.y } })) as any}
+                    onResizeStop={((_e: any, _direction: any, ref: any, _delta: any, pos: any) => onUpdateOverlay(overlay.id, { size: { width: parseInt(ref.style.width), height: parseInt(ref.style.height) }, position: pos })) as any}
                     scale={zoom}
                     disableDragging={overlay.locked}
                     enableResizing={!overlay.locked}

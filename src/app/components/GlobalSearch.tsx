@@ -27,10 +27,10 @@ export function GlobalSearch({ samples, files, users, shareLinks, query: control
     const q = query.toLowerCase();
 
     const sampleMatches = samples.filter(sample =>
-      sample.sampleId.toLowerCase().includes(q) ||
-      sample.site.toLowerCase().includes(q) ||
-      sample.area.toLowerCase().includes(q) ||
-      sample.equipment.toLowerCase().includes(q) ||
+      (sample.sampleId?.toLowerCase().includes(q) || false) ||
+      (sample.site?.toLowerCase().includes(q) || false) ||
+      (sample.area?.toLowerCase().includes(q) || false) ||
+      (sample.equipment?.toLowerCase().includes(q) || false) ||
       sample.collector.toLowerCase().includes(q) ||
       (sample.notes || '').toLowerCase().includes(q) ||
       (sample.labName || '').toLowerCase().includes(q)

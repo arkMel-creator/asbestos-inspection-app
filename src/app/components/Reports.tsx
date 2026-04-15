@@ -28,7 +28,7 @@ export function Reports({ samples, files }: ReportsProps) {
         'Level': sample.level || '',
         'Area / Room': sample.area,
         'Material Description': sample.materialDescription || '',
-        'Analysis Result': sample.status === 'positive' ? (sample.asbestosType || 'Asbestos Detected') : sample.status === 'negative' ? 'No Asbestos Detected' : sample.status.replace('-', ' '),
+        'Analysis Result': sample.status === 'positive' ? (sample.asbestosType || 'Asbestos Detected') : sample.status === 'negative' ? 'No Asbestos Detected' : (sample.status?.replace('-', ' ') || 'Pending'),
         'Condition': sample.condition || '',
         'Accessibility': sample.accessibility || '',
         'Amount / Quantity': sample.amount || '',

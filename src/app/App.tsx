@@ -10,7 +10,7 @@ import { Workspace } from './components/Workspace';
 import { Reports } from './components/Reports';
 import { MapOverlay, User, ShareLink, FileItem, Sample, AuditLogEntry, SyncQueueItem, Project } from './types';
 import { Button } from './components/ui/button';
-import { LayoutDashboard, Map, Users, Share2, Menu, X, ClipboardList, History, LogOut, CloudOff, Search, Briefcase, Plus, MapPin, Filter, ChevronRight, Edit2, ArrowLeft, Check, FileClock, Settings } from 'lucide-react';
+import { LayoutDashboard, Map, Users, Share2, Menu, X, ClipboardList, History, LogOut, CloudOff, Search, Briefcase, Plus, ChevronRight, Edit2, ArrowLeft, Check, FileClock, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Label } from './components/ui/label';
 import { Input } from './components/ui/input';
