@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShareLink } from '../types';
+import { ShareLink } from '../types/index';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';

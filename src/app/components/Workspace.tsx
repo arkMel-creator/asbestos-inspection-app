@@ -2,7 +2,7 @@ import { Samples } from './Samples';
 import { Files } from './Files';
 import { Reports } from './Reports';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Sample, FileItem, User, Project } from '../types';
+import { Sample, FileItem, User, Project } from '../types/index';
 import { Badge } from './ui/badge';
 import { Calendar, MapPin, User as UserIcon, Building2, Map as MapIcon } from 'lucide-react';
 import { Button } from './ui/button';

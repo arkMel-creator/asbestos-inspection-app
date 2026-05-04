@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FileItem, Sample } from '../types';
+import { FileItem, Sample } from '../types/index';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';

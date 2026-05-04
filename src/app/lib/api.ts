@@ -1,4 +1,4 @@
-import { FileItem, Sample, ShareLink, User, Project } from '../types';
+import { FileItem, Sample, ShareLink, User, Project } from '../types/index';
 
 const API_BASE = '/api';
 const TOKEN_KEY = 'aims.token';

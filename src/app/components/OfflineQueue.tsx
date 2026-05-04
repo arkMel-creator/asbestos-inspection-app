@@ -1,7 +1,7 @@
 ﻿import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { SyncQueueItem } from '../types';
+import { SyncQueueItem } from '../types/index';
 import { CloudOff, CloudUpload, Trash2 } from 'lucide-react';
 
 interface OfflineQueueProps {

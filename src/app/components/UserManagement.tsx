@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User } from '../types';
+import { User } from '../types/index';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';

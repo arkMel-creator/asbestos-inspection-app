@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Sample, SampleFieldDefinition, SampleFieldType, SampleStatus } from '../types';
+import { Sample, SampleFieldDefinition, SampleFieldType, SampleStatus } from '../types/index';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -23,7 +23,7 @@ interface SamplesProps {
 const statusOptions: SampleStatus[] = ['pending', 'positive', 'negative', 'removed', 'presumed', 'strongly-presumed'];
 const fieldTypes: SampleFieldType[] = ['text', 'number', 'date', 'dropdown', 'multi-select', 'checkbox'];
 
-const statusBadge = (status: SampleStatus) => {
+const statusBadge = (status: SampleStatus | string | undefined) => {
   switch (status) {
     case 'pending': return 'bg-yellow-100 text-yellow-800';
     case 'positive': return 'bg-red-100 text-red-800';
@@ -41,14 +41,14 @@ const defaultSchema: SampleFieldDefinition[] = [
   { key: 'itemDescription', label: 'Source or Item Description', type: 'text', required: true },
   { key: 'materialType', label: 'Hazardous Material Type', type: 'text', required: true },
   { key: 'sampleNo', label: 'Sample No', type: 'text', required: true },
-  { key: 'assessmentStatus', label: 'Assessment status*', type: 'dropdown', required: true, options: statusOptions },
-  { key: 'friability', label: 'Friability*', type: 'dropdown', required: true, options: ['Friable', 'Non-Friable'] },
-  { key: 'materialCondition', label: 'Material Condition*', type: 'dropdown', required: true, options: ['Good', 'Fair', 'Poor', 'Very Poor'] },
-  { key: 'deteriorationPotential', label: 'Damage or Deterioration Potential*', type: 'dropdown', required: true, options: ['Low', 'Medium', 'High'] },
-  { key: 'activityLevel', label: 'Activity Level*', type: 'dropdown', required: true, options: ['Low', 'Medium', 'High'] },
-  { key: 'accessibility', label: 'Accessibility*', type: 'dropdown', required: true, options: ['Easy', 'Moderate', 'Difficult', 'Inaccessible'] },
-  { key: 'priorityLevel', label: 'Priority Level*', type: 'dropdown', required: true, options: ['Low', 'Medium', 'High', 'Very High'] },
-  { key: 'reinspectionSchedule', label: 'Recommended Re-inspection Schedule* (Years)', type: 'number', required: true },
+  { key: 'assessmentStatus', label: 'Assessment status', type: 'dropdown', required: true, options: statusOptions },
+  { key: 'friability', label: 'Friability', type: 'dropdown', required: true, options: ['Friable', 'Non-Friable'] },
+  { key: 'materialCondition', label: 'Material Condition', type: 'dropdown', required: true, options: ['Good', 'Fair', 'Poor', 'Very Poor'] },
+  { key: 'deteriorationPotential', label: 'Damage or Deterioration Potential', type: 'dropdown', required: true, options: ['Low', 'Medium', 'High'] },
+  { key: 'activityLevel', label: 'Activity Level', type: 'dropdown', required: true, options: ['Low', 'Medium', 'High'] },
+  { key: 'accessibility', label: 'Accessibility', type: 'dropdown', required: true, options: ['Easy', 'Moderate', 'Difficult', 'Inaccessible'] },
+  { key: 'priorityLevel', label: 'Priority Level', type: 'dropdown', required: true, options: ['Low', 'Medium', 'High', 'Very High'] },
+  { key: 'reinspectionSchedule', label: 'Recommended Re-inspection Schedule (Years)', type: 'number', required: true },
   { key: 'approxQuantity', label: 'Approx. Quantity (m2/linear m)', type: 'text', required: true },
   { key: 'controlRecommendation', label: 'Control Recommendation', type: 'text', required: false },
   { key: 'notes', label: 'Comments', type: 'text', required: false },
@@ -57,17 +57,17 @@ const defaultSchema: SampleFieldDefinition[] = [
 ];
 
 const protectedKeys = new Set([
-  'location',
-  'surfaceType',
-  'itemDescription',
-  'materialType',
-  'sampleNo',
-  'assessmentStatus',
-  'friability',
-  'materialCondition',
-  'collectionDate',
-  'collector'
+  'location', 'surfaceType', 'itemDescription', 'materialType',
+  'sampleNo', 'assessmentStatus', 'friability', 'materialCondition',
+  'collectionDate', 'collector'
 ]);
+
+const getFieldValue = (obj: Record<string, unknown>, key: string): string => {
+  const val = obj[key];
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'object') return JSON.stringify(val);
+  return String(val);
+};
 
 export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canManageSchema, defaultSite }: SamplesProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,8 +76,8 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
   const [schema, setSchema] = useState<SampleFieldDefinition[]>(defaultSchema);
   const [editingSample, setEditingSample] = useState<Sample | null>(null);
 
-  const [newSample, setNewSample] = useState<Omit<Sample, 'id'>>({
-    sampleNo: `S-${1000 + samples.length + 1}`,
+  const buildNewSample = (count: number): Omit<Sample, 'id'> => ({
+    sampleNo: `S-${1000 + count + 1}`,
     location: { x: 0, y: 0 },
     surfaceType: '',
     itemDescription: '',
@@ -99,32 +99,32 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
     customFields: {}
   });
 
+  const [newSample, setNewSample] = useState<Omit<Sample, 'id'>>(() => buildNewSample(0));
+
+  useEffect(() => {
+    setNewSample(buildNewSample(samples.length));
+  }, [samples.length]);
+
   useEffect(() => {
     if (defaultSite) {
-      setNewSample(prev => ({ ...prev, location: { x: 0, y: 0 } }));
+      setNewSample(prev => ({ ...prev }));
     }
   }, [defaultSite]);
 
   const filteredSamples = samples.filter(sample =>
-    Object.values(sample).some(val => 
+    Object.values(sample).some(val =>
       String(val).toLowerCase().includes(searchTerm.toLowerCase())
     )
   );
 
   const handleAddSample = () => {
-    if (newSample.sampleNo && newSample.location && newSample.materialType) {
-      onAddSample(newSample);
-      setIsAddOpen(false);
-      setNewSample({
-        ...newSample,
-        sampleNo: `S-${1000 + samples.length + 2}`,
-        itemDescription: '',
-        approxQuantity: '',
-        notes: ''
-      });
-    } else {
-      toast.error('Please fill in required fields');
+    if (!newSample.sampleNo || !newSample.materialType) {
+      toast.error('Please fill in Sample No and Material Type');
+      return;
     }
+    onAddSample(newSample);
+    setIsAddOpen(false);
+    setNewSample(buildNewSample(samples.length + 1));
   };
 
   const handleUpdateSampleSubmit = () => {
@@ -137,13 +137,15 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
 
   const handleAddField = () => {
     const key = `field_${Date.now()}`;
-    setSchema([...schema, { key, label: 'New Field', type: 'text', required: false }]);
+    setSchema(prev => [...prev, { key, label: 'New Field', type: 'text', required: false }]);
   };
 
   const updateField = (index: number, updates: Partial<SampleFieldDefinition>) => {
-    const newSchema = [...schema];
-    newSchema[index] = { ...newSchema[index], ...updates };
-    setSchema(newSchema);
+    setSchema(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...updates };
+      return next;
+    });
   };
 
   const removeField = (index: number) => {
@@ -152,15 +154,30 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
       toast.error('Cannot remove system field');
       return;
     }
-    setSchema(schema.filter((_, i) => i !== index));
+    setSchema(prev => prev.filter((_, i) => i !== index));
   };
+
+  const setNewSampleField = (key: string, value: string) => {
+    setNewSample(prev => ({ ...prev, [key]: value }));
+  };
+
+  const setEditingSampleField = (key: string, value: string) => {
+    if (!editingSample) return;
+    setEditingSample(prev => prev ? { ...prev, [key]: value } : prev);
+  };
+
+  const getDisplayStatus = (sample: Sample) =>
+    (sample.assessmentStatus || sample.status || 'pending') as SampleStatus;
+
+  const getDisplayCondition = (sample: Sample) =>
+    sample.materialCondition || 'N/A';
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-bold text-slate-900">Inspection Data</h3>
-          <p className="text-sm text-slate-500 font-medium text-slate-500">Hazardous Materials Register & Assessment</p>
+          <p className="text-sm text-slate-500 font-medium">Hazardous Materials Register & Assessment</p>
         </div>
         <div className="flex gap-2">
           {canManageSchema && (
@@ -209,38 +226,51 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
               <TableBody>
                 {filteredSamples.map((sample) => (
                   <TableRow key={sample.id} className="hover:bg-slate-50/50 border-b border-slate-100 last:border-0">
-                    <TableCell className="font-mono font-bold text-emerald-700">{sample.sampleNo || sample.sampleId}</TableCell>
+                    <TableCell className="font-mono font-bold text-emerald-700">
+                      {sample.sampleNo || sample.sampleId || sample.id}
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-bold text-slate-900 text-sm">
-                          {typeof sample.location === 'object' ? `${sample.location.x},${sample.location.y}` : 'N/A'}
+                          {typeof sample.location === 'object' && sample.location
+                            ? (sample.surfaceType || `${(sample.location as {x:number;y:number}).x},${(sample.location as {x:number;y:number}).y}`)
+                            : sample.surfaceType || 'N/A'}
                         </span>
-                        <span className="text-[11px] text-slate-500 font-medium">{sample.surfaceType || sample.area}</span>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {sample.surfaceType || sample.area || ''}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="text-sm text-slate-700 font-medium">{sample.materialType}</span>
+                        <span className="text-sm text-slate-700 font-medium">{sample.materialType || '—'}</span>
                         <span className="text-[10px] text-slate-400 italic line-clamp-1">{sample.itemDescription}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <span className={`text-[10px] font-black uppercase px-2 py-1 rounded border ${
-                        sample.materialCondition === 'Very Poor' ? 'bg-red-50 text-red-700 border-red-100' :
-                        sample.materialCondition === 'Poor' ? 'bg-orange-50 text-orange-700 border-orange-100' :
-                        sample.materialCondition === 'Fair' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                        getDisplayCondition(sample) === 'Very Poor' ? 'bg-red-50 text-red-700 border-red-100' :
+                        getDisplayCondition(sample) === 'Poor' ? 'bg-orange-50 text-orange-700 border-orange-100' :
+                        getDisplayCondition(sample) === 'Fair' ? 'bg-amber-50 text-amber-700 border-amber-100' :
                         'bg-emerald-50 text-emerald-700 border-emerald-100'
                       }`}>
-                        {sample.materialCondition || 'N/A'}
+                        {getDisplayCondition(sample)}
                       </span>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge className={`${statusBadge(sample.assessmentStatus || sample.status as any)} border-0 shadow-none text-[10px] font-bold uppercase`}>
-                        {(sample.assessmentStatus || sample.status || 'pending').replace('-', ' ')}
+                      <Badge className={`${statusBadge(getDisplayStatus(sample))} border-0 shadow-none text-[10px] font-bold uppercase`}>
+                        {getDisplayStatus(sample).replace(/-/g, ' ')}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600" onClick={() => setEditingSample(sample)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600"
+                        onClick={() => setEditingSample(sample)}
+                        disabled={!canEdit}
+                        title="Edit sample"
+                      >
                         <Edit2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
@@ -249,7 +279,7 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
                 {filteredSamples.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="py-20 text-center text-slate-400 italic font-medium">
-                      No matching records found in this project.
+                      {searchTerm ? `No records matching "${searchTerm}"` : 'No inspection records yet. Click "New Inspection" to add one.'}
                     </TableCell>
                   </TableRow>
                 )}
@@ -267,44 +297,51 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
               <DialogTitle className="text-white text-xl font-bold">New Inspection Entry</DialogTitle>
             </DialogHeader>
             <div className="flex items-center gap-2">
-               <div className="px-3 py-1 bg-emerald-500 rounded text-[10px] font-black uppercase">Div 6</div>
+              <div className="px-3 py-1 bg-emerald-500 rounded text-[10px] font-black uppercase">Div 6</div>
             </div>
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
               {schema.map((field) => (
-                <div key={field.key} className={field.key === 'notes' || field.key === 'itemDescription' || field.key === 'controlRecommendation' ? 'col-span-full space-y-2' : 'space-y-2'}>
-                  <Label htmlFor={field.key} className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <div
+                  key={field.key}
+                  className={
+                    field.key === 'notes' || field.key === 'itemDescription' || field.key === 'controlRecommendation'
+                      ? 'col-span-full space-y-2'
+                      : 'space-y-2'
+                  }
+                >
+                  <Label htmlFor={`new-${field.key}`} className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
                     {field.label}
                     {field.required && <span className="text-red-500">*</span>}
                   </Label>
                   {field.type === 'dropdown' ? (
-                    <Select 
-                      value={(newSample as any)[field.key] || ''} 
-                      onValueChange={(val) => setNewSample({ ...newSample, [field.key]: val })}
+                    <Select
+                      value={getFieldValue(newSample as unknown as Record<string, unknown>, field.key)}
+                      onValueChange={(val) => setNewSampleField(field.key, val)}
                     >
                       <SelectTrigger className="h-11 bg-slate-50 border-slate-200 focus:ring-blue-500 font-medium">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {field.options?.map(opt => (
-                          <SelectItem key={opt} value={opt}>{opt.replace('-', ' ')}</SelectItem>
+                          <SelectItem key={opt} value={opt}>{opt.replace(/-/g, ' ')}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   ) : (
                     <Input
-                      id={field.key}
+                      id={`new-${field.key}`}
                       type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                      value={(newSample as any)[field.key] || ''}
-                      onChange={(e) => setNewSample({ ...newSample, [field.key]: e.target.value })}
+                      value={getFieldValue(newSample as unknown as Record<string, unknown>, field.key)}
+                      onChange={(e) => setNewSampleField(field.key, e.target.value)}
                       className="h-11 bg-slate-50 border-slate-200 focus:ring-blue-500 font-medium"
-                      placeholder={`Enter ${field.label.split('*')[0]}...`}
+                      placeholder={`Enter ${field.label.split('*')[0].trim()}...`}
                     />
                   )}
                 </div>
               ))}
-              
+
               <div className="col-span-full pt-4">
                 <Label className="text-[11px] font-black text-slate-500 uppercase tracking-wider mb-2 block">Site Photo</Label>
                 <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group">
@@ -315,7 +352,9 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
             </div>
             <div className="flex justify-end gap-3 pt-8 mt-8 border-t border-slate-100">
               <Button variant="ghost" onClick={() => setIsAddOpen(false)} className="h-12 px-8 font-bold text-slate-500">Cancel</Button>
-              <Button onClick={handleAddSample} className="h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-10 shadow-lg shadow-emerald-100">Save Inspection</Button>
+              <Button onClick={handleAddSample} className="h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-10 shadow-lg shadow-emerald-100">
+                Save Inspection
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -324,32 +363,43 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
       {/* Edit Sample Dialog */}
       <Dialog open={!!editingSample} onOpenChange={(o) => !o && setEditingSample(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 border-0">
-          <div className="bg-blue-600 text-white px-6 py-4 flex items-center justify-between">
+          <div className="bg-blue-600 text-white px-6 py-4">
             <DialogHeader>
-              <DialogTitle className="text-white text-xl font-bold">Edit Record: {editingSample?.sampleNo || editingSample?.sampleId}</DialogTitle>
+              <DialogTitle className="text-white text-xl font-bold">
+                Edit Record: {editingSample?.sampleNo || editingSample?.sampleId}
+              </DialogTitle>
             </DialogHeader>
           </div>
           <div className="p-6">
             {editingSample && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                 {schema.map((field) => (
-                  <div key={field.key} className={field.key === 'notes' || field.key === 'itemDescription' || field.key === 'controlRecommendation' ? 'col-span-full space-y-2' : 'space-y-2'}>
+                  <div
+                    key={field.key}
+                    className={
+                      field.key === 'notes' || field.key === 'itemDescription' || field.key === 'controlRecommendation'
+                        ? 'col-span-full space-y-2'
+                        : 'space-y-2'
+                    }
+                  >
                     <Label className="text-[11px] font-black text-slate-500 uppercase tracking-wider">{field.label}</Label>
                     {field.type === 'dropdown' ? (
-                      <Select 
-                        value={(editingSample as any)[field.key] || ''} 
-                        onValueChange={(val) => setEditingSample({ ...editingSample, [field.key]: val })}
+                      <Select
+                        value={getFieldValue(editingSample as unknown as Record<string, unknown>, field.key)}
+                        onValueChange={(val) => setEditingSampleField(field.key, val)}
                       >
                         <SelectTrigger className="h-11 bg-slate-50 border-slate-200"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {field.options?.map(opt => <SelectItem key={opt} value={opt}>{opt.replace('-', ' ')}</SelectItem>)}
+                          {field.options?.map(opt => (
+                            <SelectItem key={opt} value={opt}>{opt.replace(/-/g, ' ')}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     ) : (
                       <Input
                         type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-                        value={(editingSample as any)[field.key] || ''}
-                        onChange={(e) => setEditingSample({ ...editingSample, [field.key]: e.target.value })}
+                        value={getFieldValue(editingSample as unknown as Record<string, unknown>, field.key)}
+                        onChange={(e) => setEditingSampleField(field.key, e.target.value)}
                         className="h-11 bg-slate-50 border-slate-200 font-medium"
                       />
                     )}
@@ -359,13 +409,15 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
             )}
             <div className="flex justify-end gap-3 pt-8 mt-8 border-t border-slate-100">
               <Button variant="ghost" onClick={() => setEditingSample(null)} className="h-12 px-8 font-bold text-slate-500">Cancel</Button>
-              <Button onClick={handleUpdateSampleSubmit} className="h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold px-10 shadow-lg shadow-blue-100">Update Entry</Button>
+              <Button onClick={handleUpdateSampleSubmit} className="h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold px-10 shadow-lg shadow-blue-100">
+                Update Entry
+              </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Schema Management */}
+      {/* Schema Management Dialog */}
       <Dialog open={isSchemaOpen} onOpenChange={setIsSchemaOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader><DialogTitle className="font-bold">Form Configuration</DialogTitle></DialogHeader>
@@ -374,23 +426,67 @@ export function Samples({ samples, onAddSample, onUpdateSample, canEdit, canMana
               {schema.map((field, index) => (
                 <div key={field.key} className="flex items-center gap-3 p-3 border rounded-lg bg-slate-50/50">
                   <div className="flex-1 grid grid-cols-3 gap-2">
-                    <Input value={field.label} onChange={(e) => updateField(index, { label: e.target.value })} className="h-9 font-bold text-xs" disabled={protectedKeys.has(field.key)} />
-                    <Select value={field.type} onValueChange={(val: any) => updateField(index, { type: val })} disabled={protectedKeys.has(field.key)}>
+                    <Input
+                      value={field.label}
+                      onChange={(e) => updateField(index, { label: e.target.value })}
+                      className="h-9 font-bold text-xs"
+                      disabled={protectedKeys.has(field.key)}
+                      placeholder="Field label"
+                    />
+                    <Select
+                      value={field.type}
+                      onValueChange={(val) => updateField(index, { type: val as SampleFieldType })}
+                      disabled={protectedKeys.has(field.key)}
+                    >
                       <SelectTrigger className="h-9 text-xs font-bold"><SelectValue /></SelectTrigger>
-                      <SelectContent>{fieldTypes.map(ft => <SelectItem key={ft} value={ft}>{ft}</SelectItem>)}</SelectContent>
+                      <SelectContent>
+                        {fieldTypes.map(ft => <SelectItem key={ft} value={ft}>{ft}</SelectItem>)}
+                      </SelectContent>
                     </Select>
                     <div className="flex items-center gap-2 px-2">
-                      <input type="checkbox" checked={field.required} onChange={(e) => updateField(index, { required: e.target.checked })} disabled={protectedKeys.has(field.key)} />
-                      <span className="text-[10px] font-black uppercase text-slate-400">Required</span>
+                      <input
+                        type="checkbox"
+                        checked={field.required}
+                        onChange={(e) => updateField(index, { required: e.target.checked })}
+                        disabled={protectedKeys.has(field.key)}
+                        id={`required-${field.key}`}
+                      />
+                      <label htmlFor={`required-${field.key}`} className="text-[10px] font-black uppercase text-slate-400 cursor-pointer">Required</label>
                     </div>
                   </div>
-                  {!protectedKeys.has(field.key) && <Button variant="ghost" size="icon" onClick={() => removeField(index)}><Settings className="h-4 w-4 text-destructive" /></Button>}
+                  {!protectedKeys.has(field.key) && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeField(index)}
+                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      title="Remove field"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {protectedKeys.has(field.key) && (
+                    <div className="h-8 w-8 flex items-center justify-center">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase">System</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
-            <Button variant="outline" className="w-full border-dashed h-11 font-bold text-slate-500" onClick={handleAddField}><Plus className="h-4 w-4 mr-2" />Add Custom Inspection Column</Button>
+            <Button
+              variant="outline"
+              className="w-full border-dashed h-11 font-bold text-slate-500"
+              onClick={handleAddField}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Custom Inspection Column
+            </Button>
           </div>
-          <div className="flex justify-end gap-2 border-t pt-4"><Button onClick={() => setIsSchemaOpen(false)} className="h-11 px-8 font-bold">Close & Save</Button></div>
+          <div className="flex justify-end gap-2 border-t pt-4">
+            <Button onClick={() => setIsSchemaOpen(false)} className="h-11 px-8 font-bold">
+              Close & Save
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

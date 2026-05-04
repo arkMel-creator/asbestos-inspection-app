@@ -8,7 +8,7 @@ import { OfflineQueue } from './components/OfflineQueue';
 import { GlobalSearch } from './components/GlobalSearch';
 import { Workspace } from './components/Workspace';
 import { Reports } from './components/Reports';
-import { MapOverlay, User, ShareLink, FileItem, Sample, AuditLogEntry, SyncQueueItem, Project } from './types';
+import { MapOverlay, User, ShareLink, FileItem, Sample, AuditLogEntry, SyncQueueItem, Project } from './types/index';
 import { Button } from './components/ui/button';
 import { LayoutDashboard, Map, Users, Share2, Menu, X, ClipboardList, History, LogOut, CloudOff, Search, Briefcase, Plus, ChevronRight, Edit2, ArrowLeft, Check, FileClock, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
@@ -46,6 +46,24 @@ export default function App() {
   const [currentProjectsTab, setCurrentProjectsTab] = useState<'active' | 'completed' | 'all'>('active');
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // Form state for create/edit project (replaces <form> to avoid page reload)
+  const [createFormData, setCreateFormData] = useState({
+    jobNumber: '',
+    name: '',
+    client: '',
+    site: '',
+    category: '',
+    template: '',
+    manager: '',
+    startDate: new Date().toISOString().split('T')[0],
+    dueDate: '',
+    pricingModel: 'fixed' as 'fixed' | 'time-materials',
+    estimatedCost: '',
+    description: '',
+  });
+  const [editFormData, setEditFormData] = useState<Partial<Project & { password?: string }>>({});
+
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const canEdit = currentUser?.role === 'admin' || currentUser?.role === 'inspector';
@@ -68,14 +86,11 @@ export default function App() {
 
   const calculateNextJobNumber = () => {
     if (projects.length === 0) return 'A000000';
-    
-    // Find highest job number starting with 'A'
     const jobNumbers = projects
       .map(p => p.jobNumber || '')
       .filter(n => n.startsWith('A') && /A\d{6}/.test(n))
       .map(n => parseInt(n.substring(1)))
       .sort((a, b) => b - a);
-      
     const nextNum = jobNumbers.length > 0 ? jobNumbers[0] + 1 : projects.length;
     return `A${String(nextNum).padStart(6, '0')}`;
   };
@@ -83,12 +98,13 @@ export default function App() {
   const handleAddProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       const saved = await api.createProject(projectData);
-      setProjects([saved, ...projects]);
+      setProjects(prev => [saved, ...prev]);
       toast.success('Project created successfully');
       addAudit('Created project', saved.name);
       return saved;
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to create project');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create project';
+      toast.error(message);
       return null;
     }
   };
@@ -96,29 +112,30 @@ export default function App() {
   const handleUpdateProject = async (id: string, updates: Partial<Project>) => {
     try {
       const updated = await api.updateProject(id, updates);
-      setProjects(projects.map(p => p.id === id ? updated : p));
+      setProjects(prev => prev.map(p => p.id === id ? updated : p));
       if (selectedProject?.id === id) setSelectedProject(updated);
       toast.success('Project updated');
       addAudit('Updated project', updated.name);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update project');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update project';
+      toast.error(message);
     }
   };
 
   const handleDeleteProject = async (id: string) => {
     try {
       await api.deleteProject(id);
-      setProjects(projects.filter(p => p.id !== id));
+      setProjects(prev => prev.filter(p => p.id !== id));
       if (selectedProject?.id === id) setSelectedProject(null);
       toast.success('Project deleted');
       addAudit('Deleted project', id);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete project');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete project';
+      toast.error(message);
     }
   };
 
-  // Overlay management
-  const queueIfOffline = (action: 'create' | 'update' | 'delete' | 'upload', entity: string, payload: any) => {
+  const queueIfOffline = (action: 'create' | 'update' | 'delete' | 'upload', entity: string, payload: Record<string, unknown>) => {
     if (isOnline) return;
     const item: SyncQueueItem = {
       id: Date.now().toString(),
@@ -132,9 +149,9 @@ export default function App() {
   };
 
   const handleUpdateOverlay = (id: string, updates: Partial<MapOverlay>) => {
-    setOverlays(overlays.map(o => o.id === id ? { ...o, ...updates } : o));
+    setOverlays(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
     addAudit('Updated overlay', id);
-    queueIfOffline('update', 'overlay', { id, updates });
+    queueIfOffline('update', 'overlay', { id, ...updates });
   };
 
   const handleReorderOverlay = (id: string, direction: 'up' | 'down') => {
@@ -149,17 +166,18 @@ export default function App() {
     const targetZ = target.zIndex ?? swapIndex + 1;
     current.zIndex = targetZ;
     target.zIndex = currentZ;
-    setOverlays(ordered);
+    setOverlays([...ordered]);
   };
 
   const handleDeleteOverlay = async (id: string) => {
-    setOverlays(overlays.filter(o => o.id !== id));
-    setFiles(files.map(f => f.overlayId === id ? { ...f, isOverlay: false, overlayId: undefined } : f));
+    setOverlays(prev => prev.filter(o => o.id !== id));
+    setFiles(prev => prev.map(f => f.overlayId === id ? { ...f, isOverlay: false, overlayId: undefined } : f));
     const affected = files.filter(f => f.overlayId === id);
     try {
       await Promise.all(affected.map(file => api.updateFile(file.id, { isOverlay: false, overlayId: null })));
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update overlay file');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update overlay file';
+      toast.error(message);
     }
     toast.success('Overlay removed from map');
     addAudit('Deleted overlay', id);
@@ -174,9 +192,7 @@ export default function App() {
         uploadedBy: currentUser?.name || 'Current User',
         folderPath: `/Projects/${projectName}/Maps/Overlays`
       });
-
       await api.updateFile(uploaded.id, { isOverlay: true, overlayId: uploaded.id });
-
       const newOverlay: MapOverlay = {
         id: uploaded.id,
         name: uploaded.name,
@@ -192,17 +208,16 @@ export default function App() {
         uploadedBy: uploaded.uploadedBy,
         uploadedAt: uploaded.uploadedAt
       };
-
       setFiles(prev => [...prev, { ...uploaded, isOverlay: true, overlayId: uploaded.id }]);
       setOverlays(prev => [...prev, newOverlay]);
       addAudit('Added overlay', uploaded.name);
-      queueIfOffline('create', 'overlay', { name: uploaded.name });
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to add overlay');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to add overlay';
+      toast.error(message);
     }
   };
 
-  const handleAddFile = async (file: File) => {
+  const handleAddFile = async (file: File): Promise<string> => {
     try {
       const projectName = selectedProject?.name || 'Unassigned';
       const uploaded = await api.uploadFile(file, {
@@ -214,8 +229,9 @@ export default function App() {
       addAudit('Uploaded file', uploaded.name);
       queueIfOffline('upload', 'file', { name: uploaded.name });
       return uploaded.id;
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to upload file');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to upload file';
+      toast.error(message);
       return '';
     }
   };
@@ -223,23 +239,22 @@ export default function App() {
   const handleDeleteFile = async (id: string) => {
     const file = files.find(f => f.id === id);
     if (file?.isOverlay && file.overlayId) {
-      setOverlays(overlays.filter(o => o.id !== file.overlayId));
+      setOverlays(prev => prev.filter(o => o.id !== file.overlayId));
     }
     try {
       await api.deleteFile(id);
-      setFiles(files.filter(f => f.id !== id));
+      setFiles(prev => prev.filter(f => f.id !== id));
       toast.success('File deleted');
       addAudit('Deleted file', file?.name || id);
-      queueIfOffline('delete', 'file', { id, name: file?.name });
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete file');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete file';
+      toast.error(message);
     }
   };
 
   const handleAddToMap = async (fileId: string) => {
     const file = files.find(f => f.id === fileId);
     if (!file) return;
-
     const newOverlay: MapOverlay = {
       id: file.id,
       name: file.name,
@@ -255,29 +270,27 @@ export default function App() {
       uploadedBy: file.uploadedBy,
       uploadedAt: new Date().toISOString()
     };
-
-    setOverlays([...overlays, newOverlay]);
-    setFiles(files.map(f => f.id === fileId ? { ...f, isOverlay: true, overlayId: file.id } : f));
+    setOverlays(prev => [...prev, newOverlay]);
+    setFiles(prev => prev.map(f => f.id === fileId ? { ...f, isOverlay: true, overlayId: file.id } : f));
     try {
       await api.updateFile(fileId, { isOverlay: true, overlayId: file.id });
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update file');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update file';
+      toast.error(message);
     }
     toast.success('File added to map');
     addAudit('Linked file to map', file?.name || fileId);
-    queueIfOffline('update', 'file', { id: fileId, action: 'addToMap' });
     setCurrentView('map');
   };
 
-  const handleCreateSampleFromFile = async (file: File, location?: { x: number; y: number }) => {
+  const handleCreateSampleFromFile = async (file: File, location?: { x: number; y: number }): Promise<string> => {
     const fileId = await handleAddFile(file);
     if (!fileId) return '';
     const nextIndex = 1000 + samples.length + 1;
     const sampleId = `S-${nextIndex}`;
-    const newSample: Sample = {
-      id: crypto.randomUUID(),
+    const newSample: Omit<Sample, 'id'> = {
       sampleNo: sampleId,
-      location: { x: 0, y: 0 },
+      location: location ?? { x: 0, y: 0 },
       itemDescription: 'Created from file',
       materialType: 'Unknown',
       sampleType: 'Photo',
@@ -290,38 +303,35 @@ export default function App() {
     };
     try {
       const saved = await api.createSample(newSample);
-      setSamples([saved, ...samples]);
+      setSamples(prev => [saved, ...prev]);
       await api.updateFile(fileId, { linkedSampleIds: [sampleId] });
-      setFiles(files.map(f => f.id === fileId ? { ...f, linkedSampleIds: [sampleId] } : f));
+      setFiles(prev => prev.map(f => f.id === fileId ? { ...f, linkedSampleIds: [sampleId] } : f));
       return saved.id;
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to create sample');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create sample';
+      toast.error(message);
       return '';
     }
   };
 
   const handleLinkFileToSample = async (fileId: string, sampleId: string) => {
-    const linkedIds = (() => {
-      const file = files.find(f => f.id === fileId);
-      const linked = new Set(file?.linkedSampleIds || []);
-      linked.add(sampleId);
-      return Array.from(linked);
-    })();
-    setFiles(files.map(f => {
-      if (f.id !== fileId) return f;
-      return { ...f, linkedSampleIds: linkedIds };
-    }));
-    setSamples(samples.map(s => {
+    const file = files.find(f => f.id === fileId);
+    const linked = new Set(file?.linkedSampleIds || []);
+    linked.add(sampleId);
+    const linkedIds = Array.from(linked);
+    setFiles(prev => prev.map(f => f.id !== fileId ? f : { ...f, linkedSampleIds: linkedIds }));
+    setSamples(prev => prev.map(s => {
       if (s.id !== sampleId) return s;
-      const linked = new Set(s.linkedFileIds || []);
-      linked.add(fileId);
-      return { ...s, linkedFileIds: Array.from(linked) };
+      const linkedFiles = new Set(s.linkedFileIds || []);
+      linkedFiles.add(fileId);
+      return { ...s, linkedFileIds: Array.from(linkedFiles) };
     }));
     try {
       await api.updateFile(fileId, { linkedSampleIds: linkedIds });
       toast.success('File linked to sample');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to link file');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to link file';
+      toast.error(message);
     }
     addAudit('Linked file to sample', `${fileId} -> ${sampleId}`);
   };
@@ -338,8 +348,9 @@ export default function App() {
       setUsers(prev => [newUser, ...prev]);
       toast.success('User added successfully');
       addAudit('Added user', newUser.name);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to add user');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to add user';
+      toast.error(message);
     }
   };
 
@@ -350,19 +361,21 @@ export default function App() {
       setUsers(refreshed);
       toast.success('User updated');
       addAudit('Updated user', id);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update user');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update user';
+      toast.error(message);
     }
   };
 
   const handleDeleteUser = async (id: string) => {
     try {
       await api.deleteUser(id);
-      setUsers(users.filter(u => u.id !== id));
+      setUsers(prev => prev.filter(u => u.id !== id));
       toast.success('User removed');
       addAudit('Deleted user', id);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete user');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete user';
+      toast.error(message);
     }
   };
 
@@ -376,42 +389,46 @@ export default function App() {
         createdAt: new Date().toISOString(),
         views: 0
       };
-      setShareLinks([...shareLinks, newLink]);
+      setShareLinks(prev => [...prev, newLink]);
       addAudit('Created share link', newLink.name);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to create share link');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create share link';
+      toast.error(message);
     }
   };
 
   const handleDeleteLink = async (id: string) => {
     try {
       await api.deleteShare(id);
-      setShareLinks(shareLinks.filter(l => l.id !== id));
+      setShareLinks(prev => prev.filter(l => l.id !== id));
       toast.success('Share link deleted');
       addAudit('Deleted share link', id);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete share link');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete share link';
+      toast.error(message);
     }
   };
 
   const handleAddSample = async (sample: Omit<Sample, 'id'>) => {
     try {
       const saved = await api.createSample(sample);
-      setSamples([saved, ...samples]);
+      setSamples(prev => [saved, ...prev]);
       toast.success('Sample created');
-      addAudit('Created sample', saved.sampleId);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to create sample');
+      addAudit('Created sample', saved.sampleId || saved.id);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create sample';
+      toast.error(message);
     }
   };
 
   const handleUpdateSample = async (id: string, updates: Partial<Sample>) => {
     try {
       const saved = await api.updateSample(id, updates);
-      setSamples(samples.map(s => s.id === id ? { ...s, ...saved } : s));
+      setSamples(prev => prev.map(s => s.id === id ? { ...s, ...saved } : s));
       addAudit('Updated sample', id);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update sample');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update sample';
+      toast.error(message);
     }
   };
 
@@ -428,7 +445,7 @@ export default function App() {
 
   const addAudit = (action: string, target?: string, details?: string, actorOverride?: string) => {
     const entry: AuditLogEntry = {
-      id: String(auditLog.length + 1),
+      id: String(Date.now()),
       timestamp: new Date().toISOString(),
       actor: actorOverride || currentUser?.name || 'System',
       action,
@@ -466,8 +483,9 @@ export default function App() {
         localStorage.removeItem('aims.authUser');
         localStorage.removeItem('aims.rememberedUsername');
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Login failed');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Login failed';
+      toast.error(message);
     }
   };
 
@@ -483,6 +501,41 @@ export default function App() {
     localStorage.removeItem('aims.authUser');
   };
 
+  // Initialize create form when entering create-project view
+  useEffect(() => {
+    if (currentView === 'create-project') {
+      setCreateFormData(prev => ({
+        ...prev,
+        jobNumber: calculateNextJobNumber(),
+        manager: currentUser?.name || '',
+        startDate: new Date().toISOString().split('T')[0],
+      }));
+      setSelectedStaff([]);
+    }
+  }, [currentView]);
+
+  // Initialize edit form when editing project
+  useEffect(() => {
+    if (currentView === 'edit-project' && editingProject) {
+      setEditFormData({
+        jobNumber: editingProject.jobNumber || '',
+        name: editingProject.name,
+        client: editingProject.client,
+        site: editingProject.site,
+        status: editingProject.status,
+        category: editingProject.category || '',
+        template: editingProject.template || '',
+        pricingModel: editingProject.pricingModel || 'fixed',
+        estimatedCost: editingProject.estimatedCost,
+        startDate: editingProject.startDate,
+        dueDate: editingProject.dueDate || '',
+        description: editingProject.description || '',
+        manager: editingProject.manager,
+      });
+      setSelectedStaff(editingProject.assignedStaff || []);
+    }
+  }, [currentView, editingProject]);
+
   useEffect(() => {
     const remembered = localStorage.getItem('aims.authUser');
     const token = getToken();
@@ -496,9 +549,7 @@ export default function App() {
       }
     } else {
       const rememberedUsername = localStorage.getItem('aims.rememberedUsername');
-      if (rememberedUsername) {
-        setLoginUsername(rememberedUsername);
-      }
+      if (rememberedUsername) setLoginUsername(rememberedUsername);
     }
   }, []);
 
@@ -513,11 +564,13 @@ export default function App() {
           api.fetchProjects()
         ]);
         if (!isMounted) return;
-        setSamples(samplesData);
-        setFiles(filesData);
-        setProjects(projectsData);
         
-        const overlayFiles = filesData.filter(file => file.isOverlay);
+        setSamples(Array.isArray(samplesData) ? samplesData : []);
+        setFiles(Array.isArray(filesData) ? filesData : []);
+        setProjects(Array.isArray(projectsData) ? projectsData : []);
+        
+        const actualFiles = Array.isArray(filesData) ? filesData : [];
+        const overlayFiles = actualFiles.filter(file => file.isOverlay);
         setOverlays(overlayFiles.map((file, index) => ({
           id: file.overlayId || file.id,
           name: file.name,
@@ -533,22 +586,21 @@ export default function App() {
           uploadedBy: file.uploadedBy,
           uploadedAt: file.uploadedAt
         })));
-        
         if (canManageUsers) {
           const usersData = await api.fetchUsers();
           if (!isMounted) return;
-          setUsers(usersData);
+          setUsers(Array.isArray(usersData) ? usersData : []);
         } else {
           setUsers([currentUser]);
         }
-        
         if (canManageSharing) {
           const sharesData = await api.fetchShares();
           if (!isMounted) return;
-          setShareLinks(sharesData);
+          setShareLinks(Array.isArray(sharesData) ? sharesData : []);
         }
-      } catch (err: any) {
-        toast.error(err.message || 'Failed to load data');
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to load data';
+        toast.error(message);
         handleLogout();
       }
     };
@@ -580,6 +632,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleSlash);
   }, []);
 
+  // Login screen
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-6">
@@ -599,6 +652,7 @@ export default function App() {
               <Input
                 value={loginUsername}
                 onChange={(e) => setLoginUsername(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                 placeholder="Enter username"
                 className="h-11"
               />
@@ -609,6 +663,7 @@ export default function App() {
                 type="password"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                 placeholder="Enter password"
                 className="h-11"
               />
@@ -631,7 +686,7 @@ export default function App() {
     );
   }
 
-  const userInitials = currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
+  const userInitials = (currentUser?.name || 'User').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
 
   const navigationItems = [
     { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard },
@@ -665,7 +720,6 @@ export default function App() {
   const filteredProjects = projects.filter(project => {
     if (currentProjectsTab === 'active' && project.status !== 'active') return false;
     if (currentProjectsTab === 'completed' && project.status !== 'completed') return false;
-    
     if (globalSearchQuery) {
       const query = globalSearchQuery.toLowerCase();
       return (
@@ -680,15 +734,68 @@ export default function App() {
   });
 
   const toggleStaff = (staffName: string) => {
-    setSelectedStaff(prev => 
+    setSelectedStaff(prev =>
       prev.includes(staffName) ? prev.filter(s => s !== staffName) : [...prev, staffName]
     );
+  };
+
+  const handleCreateProject = async () => {
+    if (!createFormData.client || !createFormData.name || !createFormData.site) {
+      toast.error('Please fill in Client, Job Name, and Site Address');
+      return;
+    }
+    const projectData = {
+      jobNumber: createFormData.jobNumber,
+      name: createFormData.name,
+      client: createFormData.client,
+      site: createFormData.site,
+      status: 'active' as const,
+      category: createFormData.category,
+      template: createFormData.template,
+      pricingModel: createFormData.pricingModel,
+      estimatedCost: createFormData.estimatedCost ? Number(createFormData.estimatedCost) : undefined,
+      startDate: createFormData.startDate || new Date().toISOString().split('T')[0],
+      dueDate: createFormData.dueDate || undefined,
+      description: createFormData.description,
+      manager: createFormData.manager || currentUser?.name || 'Admin',
+      assignedStaff: selectedStaff
+    };
+    const saved = await handleAddProject(projectData);
+    if (saved) {
+      handleProjectClick(saved);
+    }
+  };
+
+  const handleUpdateProjectSubmit = async () => {
+    if (!editingProject) return;
+    if (!editFormData.client || !editFormData.name || !editFormData.site) {
+      toast.error('Please fill in Client, Job Name, and Site Address');
+      return;
+    }
+    const updates: Partial<Project> = {
+      jobNumber: editFormData.jobNumber as string,
+      name: editFormData.name as string,
+      client: editFormData.client as string,
+      site: editFormData.site as string,
+      status: editFormData.status as Project['status'],
+      category: editFormData.category as string,
+      template: editFormData.template as string,
+      pricingModel: editFormData.pricingModel as Project['pricingModel'],
+      estimatedCost: editFormData.estimatedCost ? Number(editFormData.estimatedCost) : undefined,
+      startDate: editFormData.startDate as string,
+      dueDate: editFormData.dueDate as string || undefined,
+      description: editFormData.description as string,
+      manager: editFormData.manager as string,
+      assignedStaff: selectedStaff
+    };
+    await handleUpdateProject(editingProject.id, updates);
+    setCurrentView('projects');
   };
 
   return (
     <div className="min-h-screen bg-[#f3f4f6] text-foreground">
       <Toaster position="top-right" />
-      
+
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-white">
         <div className="container mx-auto px-4">
@@ -728,9 +835,8 @@ export default function App() {
                 {isOnline ? 'Online' : 'Offline'}
               </div>
               <div className="w-px h-8 bg-border/60" />
-              
               <div className="relative">
-                <button 
+                <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 p-1 rounded-lg transition-colors outline-none"
                 >
@@ -742,26 +848,19 @@ export default function App() {
                     <p className="text-[11px] text-muted-foreground leading-tight capitalize">{currentUser.role}</p>
                   </div>
                 </button>
-
                 {showProfileMenu && (
                   <>
                     <div className="fixed inset-0 z-[55]" onClick={() => setShowProfileMenu(false)} />
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 p-1 z-[60]">
-                      <button 
+                      <button
                         className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded flex items-center gap-2 transition-colors"
-                        onClick={() => {
-                          setShowProfileMenu(false);
-                          toast.info('Settings opening...');
-                        }}
+                        onClick={() => { setShowProfileMenu(false); toast.info('Settings coming soon'); }}
                       >
                         <Settings className="h-4 w-4" /> Settings
                       </button>
                       <div className="h-px bg-slate-100 my-1" />
-                      <button 
-                        onClick={() => {
-                          setShowProfileMenu(false);
-                          handleLogout();
-                        }}
+                      <button
+                        onClick={() => { setShowProfileMenu(false); handleLogout(); }}
                         className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-red-50 rounded flex items-center gap-2 transition-colors"
                       >
                         <LogOut className="h-4 w-4" /> Sign Out
@@ -809,45 +908,74 @@ export default function App() {
               </span>
             </div>
           </div>
+          {/* Mobile nav */}
+          {mobileMenuOpen && (
+            <div className="md:hidden py-2 space-y-1">
+              {navigationItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleViewChange(item.id)}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded"
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              ))}
+              <div className="h-px bg-slate-100 my-1" />
+              <button onClick={handleLogout} className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded">
+                <LogOut className="h-4 w-4" /> Sign Out
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {currentView === 'dashboard' && currentUser && (
-          <Dashboard 
-            samples={samples} 
+        {currentView === 'dashboard' && (
+          <Dashboard
+            samples={samples}
             projects={projects}
             users={users}
             currentUser={currentUser}
-            onNavigate={handleViewChange} 
-            onOpenProject={handleOpenProject} 
+            onNavigate={handleViewChange}
+            onOpenProject={handleOpenProject}
             onUpdateProject={handleUpdateProject}
           />
         )}
+
         {currentView === 'projects' && (
           <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900">Projects</h2>
                 <div className="flex items-center gap-1 mt-1">
-                  <button onClick={() => setCurrentProjectsTab('active')} className={`px-3 py-1.5 text-sm font-bold rounded-md transition-colors ${currentProjectsTab === 'active' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}>Active Jobs</button>
-                  <button onClick={() => setCurrentProjectsTab('completed')} className={`px-3 py-1.5 text-sm font-bold rounded-md transition-colors ${currentProjectsTab === 'completed' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}>Completed Jobs</button>
-                  <button onClick={() => setCurrentProjectsTab('all')} className={`px-3 py-1.5 text-sm font-bold rounded-md transition-colors ${currentProjectsTab === 'all' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}>All Jobs</button>
+                  {(['active', 'completed', 'all'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setCurrentProjectsTab(tab)}
+                      className={`px-3 py-1.5 text-sm font-bold rounded-md transition-colors ${currentProjectsTab === tab ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      {tab === 'active' ? 'Active Jobs' : tab === 'completed' ? 'Completed Jobs' : 'All Jobs'}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input 
-                    placeholder="Search jobs..." 
+                  <Input
+                    placeholder="Search jobs..."
                     className="pl-9 w-64 h-10 bg-white border-slate-200"
                     value={globalSearchQuery}
                     onChange={(e) => setGlobalSearchQuery(e.target.value)}
                   />
                 </div>
                 {canEdit && (
-                  <Button className="h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm border-0 font-bold" onClick={() => { setSelectedStaff([]); setCurrentView('create-project'); }}>
+                  <Button
+                    className="h-10 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm border-0 font-bold"
+                    onClick={() => setCurrentView('create-project')}
+                  >
                     <Plus className="h-4 w-4" />
                     New Job
                   </Button>
@@ -864,7 +992,7 @@ export default function App() {
                       <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Client</th>
                       <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Job Name / Site</th>
                       <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Assigned To</th>
-                      <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center text-center">Start Date</th>
+                      <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Start Date</th>
                       <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Due Date</th>
                       <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Status</th>
                       <th className="w-10 px-6 py-4"></th>
@@ -872,9 +1000,13 @@ export default function App() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredProjects.map((project) => (
-                      <tr key={project.id} className="hover:bg-slate-50/80 transition-colors group cursor-pointer" onClick={() => handleProjectClick(project)}>
+                      <tr
+                        key={project.id}
+                        className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                        onClick={() => handleProjectClick(project)}
+                      >
                         <td className="px-6 py-5">
-                          <span className="text-sm font-bold text-emerald-700 hover:underline">{project.jobNumber || 'No #' }</span>
+                          <span className="text-sm font-bold text-emerald-700">{project.jobNumber || 'No #'}</span>
                         </td>
                         <td className="px-6 py-5">
                           <span className="text-sm font-semibold text-slate-700">{project.client}</span>
@@ -923,14 +1055,13 @@ export default function App() {
                         </td>
                         <td className="px-6 py-5 text-right">
                           <div className="flex items-center gap-3">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setEditingProject(project);
-                                setSelectedStaff(project.assignedStaff || []);
                                 setCurrentView('edit-project');
                               }}
                             >
@@ -966,83 +1097,62 @@ export default function App() {
 
             <Card className="border-slate-200 shadow-md bg-white">
               <CardContent className="p-8">
-                <form className="space-y-10" onSubmit={async (e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  const projectData = {
-                    jobNumber: formData.get('jobNumber') as string,
-                    name: formData.get('name') as string,
-                    client: formData.get('client') as string,
-                    site: formData.get('site') as string,
-                    status: 'active' as const,
-                    category: formData.get('category') as string,
-                    template: formData.get('template') as string,
-                    pricingModel: formData.get('pricingModel') as Project['pricingModel'],
-                    estimatedCost: Number(formData.get('estimatedCost')),
-                    startDate: formData.get('startDate') as string || new Date().toISOString().split('T')[0],
-                    dueDate: formData.get('dueDate') as string || undefined,
-                    description: formData.get('description') as string,
-                    manager: formData.get('manager') as string || currentUser?.name || 'Admin',
-                    assignedStaff: selectedStaff
-                  };
-                  const saved = await handleAddProject(projectData);
-                  if (saved) { handleProjectClick(saved); }
-                }}>
-                  {/* SECTION: Basic Information */}
+                <div className="space-y-10">
+                  {/* Section 1: Basic Info */}
                   <div className="space-y-6">
                     <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                       <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">1. Basic Information</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="client" className="text-xs font-bold uppercase text-slate-500">Client*</Label>
-                        <Input id="client" name="client" placeholder="e.g. Focus Environmental" required className="h-11" />
+                        <Label htmlFor="c-client" className="text-xs font-bold uppercase text-slate-500">Client *</Label>
+                        <Input id="c-client" placeholder="e.g. Focus Environmental" required value={createFormData.client} onChange={e => setCreateFormData(p => ({ ...p, client: e.target.value }))} className="h-11" />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="jobNumber" className="text-xs font-bold uppercase text-slate-500">Job Number (Auto-suggested)</Label>
-                        <Input id="jobNumber" name="jobNumber" defaultValue={calculateNextJobNumber()} className="h-11 font-mono font-bold text-emerald-700" />
+                        <Label htmlFor="c-jobNumber" className="text-xs font-bold uppercase text-slate-500">Job Number</Label>
+                        <Input id="c-jobNumber" value={createFormData.jobNumber} onChange={e => setCreateFormData(p => ({ ...p, jobNumber: e.target.value }))} className="h-11 font-mono font-bold text-emerald-700" />
                       </div>
                       <div className="col-span-2 space-y-2">
-                        <Label htmlFor="name" className="text-xs font-bold uppercase text-slate-500">Job Name*</Label>
-                        <Input id="name" name="name" placeholder="e.g. Asbestos Audit - Site A" required className="h-11" />
+                        <Label htmlFor="c-name" className="text-xs font-bold uppercase text-slate-500">Job Name *</Label>
+                        <Input id="c-name" placeholder="e.g. Asbestos Audit - Site A" required value={createFormData.name} onChange={e => setCreateFormData(p => ({ ...p, name: e.target.value }))} className="h-11" />
                       </div>
                       <div className="col-span-2 space-y-2">
-                        <Label htmlFor="site" className="text-xs font-bold uppercase text-slate-500">Site Address*</Label>
-                        <Input id="site" name="site" placeholder="Full street address" required className="h-11" />
+                        <Label htmlFor="c-site" className="text-xs font-bold uppercase text-slate-500">Site Address *</Label>
+                        <Input id="c-site" placeholder="Full street address" required value={createFormData.site} onChange={e => setCreateFormData(p => ({ ...p, site: e.target.value }))} className="h-11" />
                       </div>
                     </div>
                   </div>
 
-                  {/* SECTION: Job Details */}
+                  {/* Section 2: Job Details */}
                   <div className="space-y-6">
                     <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                       <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">2. Job Details</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="category" className="text-xs font-bold uppercase text-slate-500">Job Category</Label>
-                        <select id="category" name="category" className="flex h-11 w-full rounded-md border border-input bg-slate-50 px-3 py-2 text-sm">
+                        <Label className="text-xs font-bold uppercase text-slate-500">Job Category</Label>
+                        <select value={createFormData.category} onChange={e => setCreateFormData(p => ({ ...p, category: e.target.value }))} className="flex h-11 w-full rounded-md border border-input bg-slate-50 px-3 py-2 text-sm">
                           <option value="">Select Category...</option>
                           {jobCategories.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="template" className="text-xs font-bold uppercase text-slate-500">Job Template</Label>
-                        <select id="template" name="template" className="flex h-11 w-full rounded-md border border-input bg-slate-50 px-3 py-2 text-sm">
+                        <Label className="text-xs font-bold uppercase text-slate-500">Job Template</Label>
+                        <select value={createFormData.template} onChange={e => setCreateFormData(p => ({ ...p, template: e.target.value }))} className="flex h-11 w-full rounded-md border border-input bg-slate-50 px-3 py-2 text-sm">
                           <option value="">Select Template...</option>
                           {jobTemplates.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="manager" className="text-xs font-bold uppercase text-slate-500">Job Manager</Label>
-                        <select id="manager" name="manager" defaultValue={currentUser?.name} className="flex h-11 w-full rounded-md border border-input bg-slate-50 px-3 py-2 text-sm">
+                        <Label className="text-xs font-bold uppercase text-slate-500">Job Manager</Label>
+                        <select value={createFormData.manager || currentUser?.name} onChange={e => setCreateFormData(p => ({ ...p, manager: e.target.value }))} className="flex h-11 w-full rounded-md border border-input bg-slate-50 px-3 py-2 text-sm">
                           {users.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
                         </select>
                       </div>
                     </div>
                   </div>
 
-                  {/* SECTION: Staff Assigned */}
+                  {/* Section 3: Staff */}
                   <div className="space-y-6">
                     <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                       <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">3. Staff Assigned</h3>
@@ -1071,44 +1181,44 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* SECTION: Dates & Financials */}
+                  {/* Section 4: Dates & Financials */}
                   <div className="space-y-6">
                     <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                       <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">4. Schedule & Financials</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="startDate" className="text-xs font-bold uppercase text-slate-500">Start Date</Label>
-                        <Input id="startDate" name="startDate" type="date" defaultValue={new Date().toISOString().split('T')[0]} required className="h-11" />
+                        <Label className="text-xs font-bold uppercase text-slate-500">Start Date</Label>
+                        <Input type="date" value={createFormData.startDate} onChange={e => setCreateFormData(p => ({ ...p, startDate: e.target.value }))} className="h-11" />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="dueDate" className="text-xs font-bold uppercase text-slate-500">Due Date</Label>
-                        <Input id="dueDate" name="dueDate" type="date" className="h-11" />
+                        <Label className="text-xs font-bold uppercase text-slate-500">Due Date</Label>
+                        <Input type="date" value={createFormData.dueDate} onChange={e => setCreateFormData(p => ({ ...p, dueDate: e.target.value }))} className="h-11" />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="pricingModel" className="text-xs font-bold uppercase text-slate-500">Pricing Model</Label>
-                        <select id="pricingModel" name="pricingModel" className="flex h-11 w-full rounded-md border border-input bg-slate-50 px-3 py-2 text-sm">
+                        <Label className="text-xs font-bold uppercase text-slate-500">Pricing Model</Label>
+                        <select value={createFormData.pricingModel} onChange={e => setCreateFormData(p => ({ ...p, pricingModel: e.target.value as 'fixed' | 'time-materials' }))} className="flex h-11 w-full rounded-md border border-input bg-slate-50 px-3 py-2 text-sm">
                           <option value="fixed">Fixed Price</option>
                           <option value="time-materials">Time & Materials</option>
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="estimatedCost" className="text-xs font-bold uppercase text-slate-500">Estimated Cost ($)</Label>
-                        <Input id="estimatedCost" name="estimatedCost" type="number" placeholder="0.00" className="h-11" />
+                        <Label className="text-xs font-bold uppercase text-slate-500">Estimated Cost ($)</Label>
+                        <Input type="number" placeholder="0.00" value={createFormData.estimatedCost} onChange={e => setCreateFormData(p => ({ ...p, estimatedCost: e.target.value }))} className="h-11" />
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="description" className="text-xs font-bold uppercase text-slate-500">Internal Description</Label>
-                    <textarea id="description" name="description" className="flex min-h-[120px] w-full rounded-md border border-input bg-slate-50 px-3 py-3 text-sm focus:bg-white transition-colors" placeholder="Enter job scope or internal notes..." />
+                    <Label className="text-xs font-bold uppercase text-slate-500">Internal Description</Label>
+                    <textarea value={createFormData.description} onChange={e => setCreateFormData(p => ({ ...p, description: e.target.value }))} className="flex min-h-[120px] w-full rounded-md border border-input bg-slate-50 px-3 py-3 text-sm focus:bg-white transition-colors" placeholder="Enter job scope or internal notes..." />
                   </div>
 
                   <div className="flex justify-end gap-4 pt-8 border-t">
                     <Button type="button" variant="ghost" onClick={() => setCurrentView('projects')} className="h-12 px-8 font-bold text-slate-500">Cancel</Button>
-                    <Button type="submit" className="h-12 bg-emerald-600 hover:bg-emerald-700 text-white border-0 shadow-lg px-12 font-bold text-lg">Save & Create Job</Button>
+                    <Button type="button" onClick={handleCreateProject} className="h-12 bg-emerald-600 hover:bg-emerald-700 text-white border-0 shadow-lg px-12 font-bold text-lg">Save & Create Job</Button>
                   </div>
-                </form>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -1125,34 +1235,13 @@ export default function App() {
 
             <Card className="border-slate-200 shadow-md bg-white">
               <CardContent className="p-8">
-                <form className="space-y-10" onSubmit={async (e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  const updates = {
-                    jobNumber: formData.get('jobNumber') as string,
-                    name: formData.get('name') as string,
-                    client: formData.get('client') as string,
-                    site: formData.get('site') as string,
-                    status: formData.get('status') as Project['status'],
-                    category: formData.get('category') as string,
-                    template: formData.get('template') as string,
-                    pricingModel: formData.get('pricingModel') as Project['pricingModel'],
-                    estimatedCost: Number(formData.get('estimatedCost')),
-                    startDate: formData.get('startDate') as string,
-                    dueDate: formData.get('dueDate') as string || undefined,
-                    description: formData.get('description') as string,
-                    manager: formData.get('manager') as string,
-                    assignedStaff: selectedStaff
-                  };
-                  await handleUpdateProject(editingProject.id, updates);
-                  setCurrentView('projects');
-                }}>
+                <div className="space-y-10">
                   <div className="space-y-6">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                       <h3 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Job Status & Basic Info</h3>
                       <div className="flex items-center gap-3">
                         <Label className="text-xs font-bold uppercase text-slate-500">Status:</Label>
-                        <select name="status" defaultValue={editingProject.status} className="h-9 rounded-md border bg-slate-50 px-3 text-xs font-bold">
+                        <select value={editFormData.status || 'active'} onChange={e => setEditFormData(p => ({ ...p, status: e.target.value as Project['status'] }))} className="h-9 rounded-md border bg-slate-50 px-3 text-xs font-bold">
                           <option value="active">Active</option>
                           <option value="completed">Completed</option>
                           <option value="on-hold">On Hold</option>
@@ -1160,10 +1249,10 @@ export default function App() {
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500">Client*</Label><Input name="client" defaultValue={editingProject.client} required className="h-11" /></div>
-                      <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500">Job Number</Label><Input name="jobNumber" defaultValue={editingProject.jobNumber} className="h-11" /></div>
-                      <div className="col-span-2 space-y-2"><Label className="text-xs font-bold uppercase text-slate-500">Job Name*</Label><Input name="name" defaultValue={editingProject.name} required className="h-11" /></div>
-                      <div className="col-span-2 space-y-2"><Label className="text-xs font-bold uppercase text-slate-500">Site Address*</Label><Input name="site" defaultValue={editingProject.site} required className="h-11" /></div>
+                      <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500">Client *</Label><Input value={editFormData.client as string || ''} onChange={e => setEditFormData(p => ({ ...p, client: e.target.value }))} required className="h-11" /></div>
+                      <div className="space-y-2"><Label className="text-xs font-bold uppercase text-slate-500">Job Number</Label><Input value={editFormData.jobNumber as string || ''} onChange={e => setEditFormData(p => ({ ...p, jobNumber: e.target.value }))} className="h-11" /></div>
+                      <div className="col-span-2 space-y-2"><Label className="text-xs font-bold uppercase text-slate-500">Job Name *</Label><Input value={editFormData.name as string || ''} onChange={e => setEditFormData(p => ({ ...p, name: e.target.value }))} required className="h-11" /></div>
+                      <div className="col-span-2 space-y-2"><Label className="text-xs font-bold uppercase text-slate-500">Site Address *</Label><Input value={editFormData.site as string || ''} onChange={e => setEditFormData(p => ({ ...p, site: e.target.value }))} required className="h-11" /></div>
                     </div>
                   </div>
 
@@ -1196,13 +1285,25 @@ export default function App() {
                   </div>
 
                   <div className="flex justify-between items-center gap-4 pt-8 border-t">
-                    <Button type="button" variant="destructive" onClick={() => { if(confirm('Are you sure? All related samples and files will be deleted.')) { handleDeleteProject(editingProject.id); setCurrentView('projects'); } }} className="h-12 px-6 font-bold">Delete Project</Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => {
+                        if (confirm('Are you sure? All related samples and files will be deleted.')) {
+                          handleDeleteProject(editingProject.id);
+                          setCurrentView('projects');
+                        }
+                      }}
+                      className="h-12 px-6 font-bold"
+                    >
+                      Delete Project
+                    </Button>
                     <div className="flex gap-3">
                       <Button type="button" variant="ghost" onClick={() => setCurrentView('projects')} className="h-12 px-8 font-bold text-slate-500">Cancel</Button>
-                      <Button type="submit" className="h-12 bg-blue-600 hover:bg-blue-700 text-white border-0 shadow-lg px-12 font-bold">Save Changes</Button>
+                      <Button type="button" onClick={handleUpdateProjectSubmit} className="h-12 bg-blue-600 hover:bg-blue-700 text-white border-0 shadow-lg px-12 font-bold">Save Changes</Button>
                     </div>
                   </div>
-                </form>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -1212,7 +1313,7 @@ export default function App() {
           <Workspace
             activeTab={workspaceTab}
             onTabChange={setWorkspaceTab}
-            samples={selectedProject ? samples.filter(s => s.site === selectedProject.site) : samples}
+            samples={selectedProject ? samples.filter(s => s.site === selectedProject.site || s.sampleNo?.startsWith('S-')) : samples}
             files={selectedProject ? files.filter(f => f.folderPath?.includes(selectedProject.name)) : files}
             canEdit={canEdit}
             canManageSchema={canManageSchema}
@@ -1223,7 +1324,7 @@ export default function App() {
             onLinkToSample={handleLinkFileToSample}
             selectedFolder={filesFolder}
             onFolderChange={setFilesFolder}
-            showTabs={false}
+            showTabs={true}
             currentUser={currentUser}
             project={selectedProject}
             onViewMap={() => setCurrentView('map')}
@@ -1231,8 +1332,8 @@ export default function App() {
         )}
 
         {currentView === 'map' && (
-          <MapView 
-            overlays={selectedProject ? overlays.filter(o => o.name.toLowerCase().includes(selectedProject.name.toLowerCase()) || (files.find(f => f.id === o.id)?.folderPath?.includes(selectedProject.name))) : overlays}
+          <MapView
+            overlays={selectedProject ? overlays.filter(o => o.name.toLowerCase().includes(selectedProject.name.toLowerCase()) || files.find(f => f.id === o.id)?.folderPath?.includes(selectedProject.name)) : overlays}
             samples={selectedProject ? samples.filter(s => s.site === selectedProject.site) : samples}
             onUpdateOverlay={handleUpdateOverlay}
             onDeleteOverlay={handleDeleteOverlay}
@@ -1248,13 +1349,23 @@ export default function App() {
             onBackToProject={() => setCurrentView('workspace')}
           />
         )}
-        
+
         {currentView === 'users' && canManageUsers && (
-          <UserManagement users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} />
+          <UserManagement
+            users={users}
+            onAddUser={handleAddUser}
+            onUpdateUser={handleUpdateUser}
+            onDeleteUser={handleDeleteUser}
+          />
         )}
-        
+
         {currentView === 'sharing' && canManageSharing && (
-          <Sharing shareLinks={shareLinks} onCreateLink={handleCreateLink} onDeleteLink={handleDeleteLink} canManage={canManageSharing} />
+          <Sharing
+            shareLinks={shareLinks}
+            onCreateLink={handleCreateLink}
+            onDeleteLink={handleDeleteLink}
+            canManage={canManageSharing}
+          />
         )}
 
         {currentView === 'audit' && canViewAudit && <AuditLog entries={auditLog} />}
@@ -1270,11 +1381,22 @@ export default function App() {
         )}
 
         {currentView === 'offline' && (
-          <OfflineQueue queue={syncQueue} isOnline={isOnline} onSync={() => { setSyncQueue([]); toast.success('Sync complete'); }} onClear={() => setSyncQueue([])} />
+          <OfflineQueue
+            queue={syncQueue}
+            isOnline={isOnline}
+            onSync={() => { setSyncQueue([]); toast.success('Sync complete'); }}
+            onClear={() => setSyncQueue([])}
+          />
         )}
 
         {currentView === 'search' && (
-          <GlobalSearch samples={samples} files={files} users={users} shareLinks={shareLinks} query={globalSearchQuery} />
+          <GlobalSearch
+            samples={samples}
+            files={files}
+            users={users}
+            shareLinks={shareLinks}
+            query={globalSearchQuery}
+          />
         )}
 
         {currentView === 'reports' && (
